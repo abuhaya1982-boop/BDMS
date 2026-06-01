@@ -13,8 +13,8 @@ const {
 
 // ═══ CONSTANTS ═══
 const A4_W = 11906, A4_H = 16838;
-const MARGIN = { top: 567, right: 567, bottom: 567, left: 567 }; // ~10mm all sides
-const CONTENT_W = A4_W - MARGIN.left - MARGIN.right; // 10772 DXA
+const MARGIN = { top: 850, right: 567, bottom: 850, left: 1134 }; // T:1.5cm R:1cm B:1.5cm L:2cm
+const CONTENT_W = A4_W - MARGIN.left - MARGIN.right; // 10205 DXA
 const FONT = 'Arial';
 const SZ = { xs: 14, sm: 16, md: 20, lg: 22, xl: 28, xxl: 36, title: 44, cover: 56 }; // half-points
 const CLR = { primary: '2A7489', dark: '000000', gray: '808080', headerBg: 'D9E2F3', white: 'FFFFFF' };
@@ -126,6 +126,16 @@ function fmtDate(d) {
   if (!d) return '-';
   try { return new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' }); }
   catch { return d; }
+}
+
+// Helper: scale an array of column widths to fit CONTENT_W
+function scaleWidths(arr) {
+  const sum = arr.reduce((a, b) => a + b, 0);
+  const scaled = arr.map(w => Math.round(w * CONTENT_W / sum));
+  // Adjust last column to absorb rounding errors
+  const diff = CONTENT_W - scaled.reduce((a, b) => a + b, 0);
+  scaled[scaled.length - 1] += diff;
+  return scaled;
 }
 
 // ═══════════════════════════════════════════
@@ -339,6 +349,22 @@ function buildDocx(doc, data) {
     page: { size: { width: A4_W, height: A4_H }, margin: MARGIN },
   };
 
+  // Footer with page numbering "Halaman X dari Y"
+  const pageFooter = new Footer({
+    children: [
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { before: 0, after: 0 },
+        children: [
+          new TextRun({ text: 'Halaman ', font: FONT, size: SZ.xs, color: CLR.gray }),
+          new TextRun({ children: [PageNumber.CURRENT], font: FONT, size: SZ.xs, color: CLR.gray }),
+          new TextRun({ text: ' dari ', font: FONT, size: SZ.xs, color: CLR.gray }),
+          new TextRun({ children: [PageNumber.TOTAL_PAGES], font: FONT, size: SZ.xs, color: CLR.gray }),
+        ],
+      }),
+    ],
+  });
+
   // ═══════════════════════════════════
   //  SECTION 1: COVER PAGE (vertically centered)
   // ═══════════════════════════════════
@@ -508,7 +534,7 @@ function buildDocx(doc, data) {
     const remaining = CONTENT_W - noWidth;
     const widths = colWidths || columns.map(() => Math.floor(remaining / columns.length));
 
-    const headerRow = new TableRow({ children: [
+    const headerRow = new TableRow({ tableHeader: true, children: [
       hCell('No', { width: noWidth }),
       ...columns.map((c, i) => hCell(c, { width: widths[i] })),
     ]});
@@ -542,12 +568,12 @@ function buildDocx(doc, data) {
 
     // Inherent Risk Table
     addSubTitle('Identifikasi Risiko (Inherent)');
-    const iW = [480, 2200, 1800, 800, 800, 700, 2858];
+    const iW = scaleWidths([480, 2200, 1800, 800, 800, 700, 2858]);
     contentChildren.push(new Table({
       width: { size: CONTENT_W, type: WidthType.DXA },
       columnWidths: iW,
       rows: [
-        new TableRow({ children: [
+        new TableRow({ tableHeader: true, children: [
           hCell('No.', { width: iW[0] }), hCell('Risiko', { width: iW[1] }), hCell('Penyebab', { width: iW[2] }),
           hCell('Prob.', { width: iW[3] }), hCell('Dampak', { width: iW[4] }),
           hCell('Skor', { width: iW[5] }), hCell('Level Inherent', { width: iW[6] }),
@@ -572,12 +598,12 @@ function buildDocx(doc, data) {
 
     // Residual Risk Table
     addSubTitle('Perlakuan Risiko (Residual / Targeted)');
-    const rW = [480, 2200, 1800, 800, 800, 700, 2858];
+    const rW = scaleWidths([480, 2200, 1800, 800, 800, 700, 2858]);
     contentChildren.push(new Table({
       width: { size: CONTENT_W, type: WidthType.DXA },
       columnWidths: rW,
       rows: [
-        new TableRow({ children: [
+        new TableRow({ tableHeader: true, children: [
           hCell('No', { width: rW[0] }), hCell('Kontrol', { width: rW[1] }), hCell('Mitigasi', { width: rW[2] }),
           hCell('Prob.', { width: rW[3] }), hCell('Dampak', { width: rW[4] }),
           hCell('Skor', { width: rW[5] }), hCell('Level Residual', { width: rW[6] }),
@@ -816,11 +842,13 @@ function buildDocx(doc, data) {
       // Change history
       {
         properties: { ...pageProps, type: SectionType.NEXT_PAGE },
+        footers: { default: pageFooter },
         children: changeHistoryChildren,
       },
       // Content pages
       {
         properties: { ...pageProps, type: SectionType.NEXT_PAGE },
+        footers: { default: pageFooter },
         children: contentChildren,
       },
     ],

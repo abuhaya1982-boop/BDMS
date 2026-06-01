@@ -315,8 +315,8 @@ function buildPrintableDoc(d, ctx) {
 
   // ── CSS ──
   const css = `
-@page{size:A4;margin:10mm}
-@page:first{margin:10mm}
+@page{size:A4;margin:15mm 10mm 15mm 20mm}
+@page:first{size:A4;margin:15mm 10mm 15mm 20mm}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;font-size:10pt;line-height:1.5;color:#1a1a1a;background:#e2e8f0;-webkit-font-smoothing:antialiased}
 .toolbar{position:fixed;top:0;left:0;right:0;background:#1a1f2e;color:#fff;padding:6px 16px;display:flex;align-items:center;gap:10px;z-index:9999;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
@@ -329,17 +329,15 @@ body{font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;font-size:10pt;line
 
 /* Pages — consistent on screen & print */
 .page-container{max-width:210mm;margin:50px auto 30px}
-.page{padding:10mm;position:relative;min-height:297mm;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.12);margin-bottom:40px}
+.page{padding:15mm 10mm 15mm 20mm;position:relative;min-height:297mm;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.12);margin-bottom:40px}
 .page-break{page-break-before:always}
 .page-top{padding-top:15mm}
 .page-number{position:absolute;bottom:10mm;right:15mm;font-size:8pt;color:#666}
 
 /* ── HALAMAN JUDUL (Cover) ── */
-.cover{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:297mm;padding:10mm;text-align:center;page-break-after:always}
+.cover{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:297mm;padding:15mm 10mm 15mm 20mm;text-align:center;page-break-after:always}
 .cover-label{font-size:18pt;font-weight:700;color:#000;letter-spacing:1.5px;margin-bottom:4px}
 .cover-company{font-size:16pt;font-weight:700;color:#2A7489;margin-bottom:30px}
-.cover-logo{margin-bottom:20px}
-.cover-logo img{height:70px}
 .cover-title-box{border:2px solid #2A7489;padding:20px 40px;margin-bottom:40px;min-width:80%}
 .cover-title{font-size:16pt;font-weight:700;line-height:1.3;color:#2A7489}
 .cover-meta{width:70%;margin:0 auto 40px;text-align:left}
@@ -395,11 +393,12 @@ table.step-tbl li{margin-bottom:1px}
 .sec-content p.content{margin:4px 0}
 .sec-content ul.content-list{margin:4px 0 8px 20px}
 
-/* Content page wrapper — repeating header on print */
+/* Content page wrapper — repeating header & footer on print */
 .content-wrap-table{width:100%;border-collapse:collapse;border:none}
-.content-wrap-table,.content-wrap-table thead,.content-wrap-table tbody,.content-wrap-table tr,.content-thead-cell,.content-tbody-cell{border:none;padding:0;margin:0}
+.content-wrap-table,.content-wrap-table thead,.content-wrap-table tbody,.content-wrap-table tfoot,.content-wrap-table tr,.content-thead-cell,.content-tbody-cell,.content-tfoot-cell{border:none;padding:0;margin:0}
 .content-thead-cell{padding:0 0 8px 0;vertical-align:top}
 .content-tbody-cell{padding:0;vertical-align:top;overflow:hidden;word-wrap:break-word;max-width:100%}
+.content-tfoot-cell{padding:8px 0 0;vertical-align:bottom;font-size:8pt;color:#666;text-align:center;border-top:0.5px solid #ccc}
 
 /* QR */
 .qr-block{display:flex;align-items:flex-start;gap:16px;margin:16px 0;padding:14px;border:1.5px solid #ccc;border-radius:6px;background:#fafafa}
@@ -415,11 +414,12 @@ table.step-tbl li{margin-bottom:1px}
   .page-container{margin:0;max-width:none}
   .page{box-shadow:none;margin:0;padding:0;min-height:auto}
   .page-break{page-break-before:always}
-  .cover{min-height:auto;height:100vh;padding:10mm;page-break-after:always}
+  .cover{min-height:auto;height:100vh;padding:15mm 10mm 15mm 20mm;page-break-after:always}
   .page-top{padding-top:0}
   .page-number{display:none}
   .content-wrap-table thead{display:table-header-group}
-  .content-page{padding:15mm 20mm;min-height:auto}
+  .content-wrap-table tfoot{display:table-footer-group}
+  .content-page{padding:15mm 10mm 15mm 20mm;min-height:auto}
   /* Prevent section titles from being orphaned at bottom of page */
   .sec-title{page-break-after:avoid;page-break-inside:avoid;break-after:avoid}
   .sub-title{page-break-after:avoid;page-break-inside:avoid;break-after:avoid}
@@ -447,7 +447,6 @@ table.step-tbl li{margin-bottom:1px}
   // ── COVER PAGE ──
   const coverHtml = `
 <div class="page cover">
-  ${logoB64 ? `<div class="cover-logo"><img src="${logoB64}" alt="PLN NP"></div>` : ''}
   <div class="cover-label">INSTRUKSI KERJA (IK)</div>
   <div class="cover-company">PT PLN NUSANTARA POWER</div>
   <div class="cover-title-box">
@@ -493,7 +492,7 @@ table.step-tbl li{margin-bottom:1px}
   // ── HEADER TABLE (used on page 2+) ──
   const hdrTable = `<table class="ik-header">
   <tr>
-    <td class="logo-cell" rowspan="3">${logoB64 ? `<img src="${logoB64}">` : 'PLN NP'}</td>
+    <td class="logo-cell" rowspan="3">PLN NP</td>
     <td class="company-cell" rowspan="2" style="width:35%">PT PLN NUSANTARA POWER<br><span style="font-size:8pt;font-weight:400">INTEGRATED MANAGEMENT SYSTEM</span></td>
     <td class="label-cell">No. Dokumen</td>
     <td class="value-cell" style="word-break:break-all">: ${nom}</td>
@@ -846,11 +845,13 @@ table.step-tbl li{margin-bottom:1px}
   <span>${nom} Rev.${rev} &mdash; Dicetak ${new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}</span>
 </div>`;
 
-  // ── PAGE 3+: Use <table><thead> trick so IMS header repeats on every printed page ──
+  // ── PAGE 3+: Use <table><thead>/<tfoot> trick so IMS header & footer repeat on every printed page ──
+  const runFooter = `<div style="text-align:center;font-size:8pt;color:#666;padding-top:4px;border-top:0.5px solid #ccc">${nom} &mdash; Rev.${rev} &mdash; PT PLN Nusantara Power UP Brantas</div>`;
   const page3 = `
 <div class="page page-break page-top content-page">
   <table class="content-wrap-table">
     <thead><tr><td class="content-thead-cell">${hdrTable}</td></tr></thead>
+    <tfoot><tr><td class="content-tfoot-cell">${runFooter}</td></tr></tfoot>
     <tbody><tr><td class="content-tbody-cell">${body}</td></tr></tbody>
   </table>
 </div>`;
@@ -949,7 +950,7 @@ function downloadAsDoc(){
     '<!--[if gte mso 9]><xml><w:LatentStyles DefLockedState="false" DefUnhideWhenUsed="false" DefSemiHidden="false" DefQFormat="false" DefPriority="99"/><\\/xml><![endif]-->';
 
   var docCss =
-    '@page WordSection1{size:210mm 297mm;margin:10mm 10mm 10mm 10mm;mso-header-margin:5mm;mso-footer-margin:5mm}' +
+    '@page WordSection1{size:210mm 297mm;margin:15mm 10mm 15mm 20mm;mso-header-margin:5mm;mso-footer-margin:5mm}' +
     'div.WordSection1{page:WordSection1}' +
     'body{font-family:"Courier New",Courier,monospace;font-size:10pt;line-height:1.6;color:#1a1a1a;background:#fff;margin:0;padding:0}' +
     'table{border-collapse:collapse;mso-table-lspace:0;mso-table-rspace:0}' +
