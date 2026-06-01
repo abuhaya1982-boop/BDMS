@@ -270,8 +270,8 @@ router.post('/', h.requireAuth, (req, res) => {
       for (const f of b.formulir) stmt.run(docId, f.nomor_form || f.nomor, f.judul_form || f.judul);
     }
     if (b.risiko?.length) {
-      const stmt = db.prepare(`INSERT INTO ik_risiko (dokumen_id, risiko, penyebab, dampak, kemungkinan, dampak_level, level_inheren, kontrol_existing, level_residual, mitigasi) VALUES (?,?,?,?,?,?,?,?,?,?)`);
-      for (const r of b.risiko) stmt.run(docId, r.risiko, r.penyebab || null, r.dampak || null, r.kemungkinan || null, r.dampak_level || null, r.skor_inheren || r.level_inheren || null, r.kontrol_existing || null, r.skor_residual || r.level_residual || null, r.mitigasi || null);
+      const stmt = db.prepare(`INSERT INTO ik_risiko (dokumen_id, risiko, penyebab, dampak, kemungkinan, dampak_level, level_inheren, kontrol_existing, level_residual, mitigasi, residual_kemungkinan, residual_dampak) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`);
+      for (const r of b.risiko) stmt.run(docId, r.risiko, r.penyebab || null, r.dampak || null, r.kemungkinan || null, r.dampak_level || null, r.skor_inheren || r.level_inheren || null, r.kontrol_existing || null, r.skor_residual || r.level_residual || null, r.mitigasi || null, r.residual_kemungkinan || null, r.residual_dampak || null);
     }
 
     h.logAudit(req, 'CREATE_DOCUMENT', `Dokumen ${nomor_dokumen} - ${b.judul} dibuat`, 'dokumen');

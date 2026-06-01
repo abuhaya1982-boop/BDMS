@@ -31,6 +31,8 @@ function migrateDB(db) {
     ["ik_documents", "ttd", "TEXT"],
     ["ik_documents", "custom_sections", "TEXT"],
     ["ik_documents", "konten", "TEXT"],
+    ["ik_risiko", "residual_kemungkinan", "TEXT"],
+    ["ik_risiko", "residual_dampak", "TEXT"],
   ];
   for (const [table, col, type] of safeCols) {
     try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch(e) { /* already exists */ }
@@ -125,6 +127,7 @@ function autoInit(db) {
       id INTEGER PRIMARY KEY AUTOINCREMENT, dokumen_id INTEGER NOT NULL, risiko TEXT NOT NULL, penyebab TEXT, dampak TEXT,
       kemungkinan TEXT DEFAULT 'C-Bisa Terjadi', dampak_level TEXT DEFAULT '2-Rendah',
       level_inheren TEXT, kontrol_existing TEXT, level_residual TEXT, mitigasi TEXT,
+      residual_kemungkinan TEXT, residual_dampak TEXT,
       FOREIGN KEY (dokumen_id) REFERENCES ik_documents(id) ON DELETE CASCADE
     );
     CREATE TABLE IF NOT EXISTS ik_approvals (
