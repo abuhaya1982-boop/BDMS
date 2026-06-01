@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brantas DMS — Sistem Pengelolaan Dokumen | PLN Nusantara Power UP Brantas</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Courier+Prime:wght@400;700&family=JetBrains+Mono:wght@300;400;500;600&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css?v=14">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%231E3A5F'/><path d='M8 7h9a1 1 0 011 1v3l3-3v15a1 1 0 01-1 1H8a1 1 0 01-1-1V8a1 1 0 011-1z' stroke='white' stroke-width='1.3' fill='none'/><path d='M10 14h8M10 17h8M10 20h5' stroke='%23D4A24C' stroke-width='1.2' stroke-linecap='round'/><circle cx='24' cy='23' r='5' fill='%232D5F8B' stroke='%231E3A5F' stroke-width='1'/><path d='M22.5 23l1 1L25.5 22' stroke='white' stroke-width='1.2' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+</head>
+<body>
+
+<script>
+// Static mode — always start at login
+const __INITIAL_STATE__ = {
+  loggedIn: false,
+  user: { name: '', role: '', original_role: '', initials: '' }
+};
+</script>
+
+<!-- LOGIN PAGE -->
+<div class="login-page" id="loginPage">
+  <div class="login-right">
+    <div class="login-logo-wrap">
+      <div class="login-logo-icon">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect width="48" height="48" rx="12" fill="#1E3A5F"/>
+          <path d="M14 12h12a2 2 0 012 2v4l4-4v20a2 2 0 01-2 2H14a2 2 0 01-2-2V14a2 2 0 012-2z" stroke="#fff" stroke-width="1.8" fill="none"/>
+          <path d="M17 20h10M17 24h10M17 28h6" stroke="#D4A24C" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M28 12l4 4h-4V12z" fill="rgba(255,255,255,0.4)"/>
+          <circle cx="35" cy="33" r="7" fill="#2D5F8B" stroke="#1E3A5F" stroke-width="1.5"/>
+          <path d="M33 33l1.5 1.5L37 31" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+    <div class="login-form-title">Brantas DMS</div>
+    <div class="login-form-sub">Brantas Document Management System</div>
+    <div class="form-field">
+      <label>NID</label>
+      <input type="text" id="loginNid" placeholder="Masukkan NID" autocomplete="username">
+    </div>
+    <div class="form-field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="Masukkan Password" autocomplete="current-password">
+    </div>
+    <div id="loginError" style="color:var(--danger);font-size:12px;margin-bottom:8px;display:none"></div>
+    <button class="btn-login" onclick="doLogin()"><i data-lucide="log-in" class="icon-16"></i> Masuk ke Sistem</button>
+    <div style="margin-top:10px;text-align:center;font-size:12px">
+      <a href="#" onclick="openForgotPassword();return false" style="color:var(--primary-mid);text-decoration:none">Lupa Password?</a>
+    </div>
+    <div class="login-footer-text">
+      <span class="login-version">Unit Pembangkitan Brantas</span>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APPLICATION -->
+<div class="app" id="mainApp" style="display:none">
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="sb-brand-icon"><i data-lucide="file-text" class="icon-16"></i></div>
+    <div>
+      <div class="sb-brand-main">Brantas DMS</div>
+      <div class="sb-brand-sub">Document Management System</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-section">Utama</div>
+    <button class="nav-item active" onclick="showPage('dashboard')" data-tooltip="Dashboard">
+      <span class="nav-icon"><i data-lucide="layout-dashboard" class="icon-16"></i></span>
+      <span class="nav-label">Dashboard</span>
+    </button>
+    <button class="nav-item" onclick="showPage('master-ik')" data-tooltip="Master Data IK">
+      <span class="nav-icon"><i data-lucide="book-open" class="icon-16"></i></span>
+      <span class="nav-label">Master Data IK</span>
+      <span class="nav-badge" id="badge-master">0</span>
+    </button>
+    <div class="nav-section" id="navSectionDokumen">Dokumen IK</div>
+    <button class="nav-item" id="navBuatIK" onclick="showPage('buat-ik')" data-tooltip="Buat IK Baru">
+      <span class="nav-icon"><i data-lucide="file-plus" class="icon-16"></i></span>
+      <span class="nav-label">Buat IK Baru</span>
+    </button>
+    <button class="nav-item" onclick="showPage('workflow')" data-tooltip="Alur Persetujuan">
+      <span class="nav-icon"><i data-lucide="git-compare" class="icon-16"></i></span>
+      <span class="nav-label">Alur Persetujuan</span>
+      <span class="nav-badge" id="badge-workflow">0</span>
+    </button>
+    <button class="nav-item" id="navTemplateEngine" onclick="showPage('template')" data-tooltip="Template Engine">
+      <span class="nav-icon"><i data-lucide="folder-open" class="icon-16"></i></span>
+      <span class="nav-label">Template Engine</span>
+    </button>
+    <div class="nav-section">Asset & Lapangan</div>
+    <button class="nav-item" onclick="showPage('equipment')" data-tooltip="Master Equipment">
+      <span class="nav-icon"><i data-lucide="settings" class="icon-16"></i></span>
+      <span class="nav-label">Master Equipment</span>
+    </button>
+    <button class="nav-item" onclick="showPage('qrcode')" data-tooltip="QR Code Manager">
+      <span class="nav-icon"><i data-lucide="scan" class="icon-16"></i></span>
+      <span class="nav-label">QR Code Manager</span>
+    </button>
+    <div class="nav-section">Analitik</div>
+    <button class="nav-item" onclick="showPage('laporan')" data-tooltip="Laporan & Monitoring">
+      <span class="nav-icon"><i data-lucide="chart-line" class="icon-16"></i></span>
+      <span class="nav-label">Laporan & Monitoring</span>
+    </button>
+    <button class="nav-item" onclick="showPage('audit')" data-tooltip="Audit Trail">
+      <span class="nav-icon"><i data-lucide="search" class="icon-16"></i></span>
+      <span class="nav-label">Audit Trail</span>
+    </button>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sb-user">
+      <div class="sb-avatar" id="sbAvatar">?</div>
+      <div class="sb-user-info">
+        <div class="sb-user-name" id="sbName">Guest</div>
+        <div class="sb-user-role" id="sbRole">Viewer · UP Brantas</div>
+      </div>
+    </div>
+    <div class="sidebar-actions">
+      <button class="btn" onclick="doLogout()" title="Keluar" style="color:var(--danger)">Keluar</button>
+      <button class="btn" onclick="openChangePasswordModal()" title="Ganti password">Ganti Password</button>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+  <header class="topbar">
+    <button class="tb-sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar"><i data-lucide="panel-left" class="icon-18"></i></button>
+    <div class="topbar-breadcrumb">
+      <span class="breadcrumb-home">Brantas DMS</span>
+      <span class="breadcrumb-sep">&#8250;</span>
+      <span class="breadcrumb-current" id="currentPageTitle">Dashboard</span>
+    </div>
+    <div class="topbar-actions">
+      <div class="search-wrap">
+        <span class="search-icon">&#128269;</span>
+        <input type="text" placeholder="Cari dokumen..." id="globalSearch" oninput="globalSearchFn(this.value)">
+      </div>
+      <div class="tb-icon-btn" onclick="openHelpQuick()" title="Bantuan & Panduan"><i data-lucide="help-circle" class="icon-16"></i></div>
+      <div class="tb-icon-btn" onclick="toggleNotif()">&#128276;<div class="badge-dot" id="notifBadgeDot" style="display:none"></div></div>
+    </div>
+  </header>
+
+  <div class="content" id="appContent">
+    <!-- Pages will be rendered by JavaScript -->
+  </div>
+</div>
+</div>
+
+<!-- NOTIFICATION PANEL -->
+<div class="notif-panel" id="notifPanel">
+  <div class="notif-panel-header">
+    <div class="notif-panel-title">&#128276; Notifikasi</div>
+    <button class="btn btn-secondary btn-xs" onclick="markAllReadNotif()">&#10003; Semua Dibaca</button>
+  </div>
+  <div class="notif-list" id="notifList"></div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="modalGeneric">
+  <div class="modal modal-lg" id="modalGenericInner">
+    <div class="modal-header">
+      <div class="modal-title" id="modalGenericTitle">Modal</div>
+      <button class="modal-close" onclick="closeModal('modalGeneric')">&#10005;</button>
+    </div>
+    <div class="modal-body" id="modalGenericBody"></div>
+    <div class="modal-footer" id="modalGenericFooter"></div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Scripts -->
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="assets/js/lib/logo-b64.js?v=6"></script>
+<script src="assets/js/lib/api.js?v=8"></script>
+<script src="assets/js/lib/utils.js?v=8"></script>
+<script src="assets/js/lib/components.js?v=6"></script>
+<script src="assets/js/pages/dashboard.js?v=6"></script>
+<script src="assets/js/pages/master-ik.js?v=6"></script>
+<script src="assets/js/pages/buat-ik.js?v=14"></script>
+<script src="assets/js/pages/workflow.js?v=9"></script>
+<script src="assets/js/pages/template.js?v=8"></script>
+<script src="assets/js/pages/equipment.js?v=6"></script>
+<script src="assets/js/pages/qrcode.js?v=6"></script>
+<script src="assets/js/pages/laporan.js?v=6"></script>
+<script src="assets/js/pages/audit.js?v=6"></script>
+<script src="assets/js/pages/master-data.js?v=7"></script>
+<script src="assets/js/pages/pengguna.js?v=6"></script>
+<script src="assets/js/pages/admin-roles.js?v=6"></script>
+<script src="assets/js/pages/admin-sessions.js?v=6"></script>
+<script src="assets/js/pages/admin-audit.js?v=6"></script>
+<script src="assets/js/pages/pengaturan.js?v=8"></script>
+<script src="assets/js/pages/help.js?v=1"></script>
+<script src="assets/js/app.js?v=18"></script>
+</body>
+</html>
