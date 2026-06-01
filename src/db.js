@@ -18,7 +18,23 @@ function getDB() {
   _db.pragma('foreign_keys = ON');
 
   if (needsInit) autoInit(_db);
+  else migrateDB(_db);
   return _db;
+}
+
+// Add missing columns to existing databases (safe — ignores if already exist)
+function migrateDB(db) {
+  const safeCols = [
+    ["ik_documents", "template_snapshot", "TEXT"],
+    ["ik_documents", "template_versi", "TEXT"],
+    ["ik_documents", "pengesahan_id", "INTEGER"],
+    ["ik_documents", "ttd", "TEXT"],
+    ["ik_documents", "custom_sections", "TEXT"],
+    ["ik_documents", "konten", "TEXT"],
+  ];
+  for (const [table, col, type] of safeCols) {
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch(e) { /* already exists */ }
+  }
 }
 
 function autoInit(db) {
@@ -61,9 +77,11 @@ function autoInit(db) {
       unit_id INTEGER, probis_id INTEGER, revisi TEXT NOT NULL DEFAULT '00',
       status TEXT NOT NULL DEFAULT 'Draft' CHECK(status IN ('Draft','Review','Approved-T1','Approved-T2','Published','Archived','Rejected')),
       tingkat_risiko TEXT DEFAULT 'Rendah', owner_id INTEGER, template_id INTEGER,
+      template_snapshot TEXT, template_versi TEXT,
       tanggal_ditetapkan TEXT, tanggal_terbit TEXT, review_due TEXT, cloud_path TEXT,
       penyusun_nama TEXT, penyusun_jabatan TEXT, tanggal_diperbarui TEXT,
-      reviewer_id INTEGER, approver_id INTEGER, submitted_by INTEGER,
+      reviewer_id INTEGER, approver_id INTEGER, pengesahan_id INTEGER, submitted_by INTEGER,
+      ttd TEXT, custom_sections TEXT, konten TEXT,
       created_at TEXT DEFAULT (datetime('now','localtime')), updated_at TEXT DEFAULT (datetime('now','localtime')),
       FOREIGN KEY (unit_id) REFERENCES units(id), FOREIGN KEY (probis_id) REFERENCES probis(id),
       FOREIGN KEY (owner_id) REFERENCES users(id), FOREIGN KEY (template_id) REFERENCES templates(id)
