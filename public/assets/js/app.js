@@ -388,7 +388,7 @@ table.step-tbl li{margin-bottom:1px}
 .qr-block .qr-text strong{font-size:9pt}
 .footer-line{border-top:1px solid #ccc;padding-top:6px;font-size:7.5pt;color:#888;display:flex;justify-content:space-between;margin-top:20px}
 
-/* ═══ PRINT — make screen & print identical ═══ */
+/* ═══ PRINT — make screen & print identical, NO section leaks ═══ */
 @media print{
   .no-print{display:none!important}
   body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -399,13 +399,27 @@ table.step-tbl li{margin-bottom:1px}
   .page-top{padding-top:15mm}
   .content-wrap-table thead{display:table-header-group}
   .content-page{padding:15mm 20mm;min-height:auto}
-  .qr-block{border-color:#000;background:#fff;page-break-inside:avoid}
-  table.tbl{page-break-inside:auto}
-  table.tbl tr{page-break-inside:avoid}
-  .sec-title{page-break-after:avoid}
-  .sub-title{page-break-after:avoid}
-  .sig-table{page-break-inside:avoid}
-  .footer-line{page-break-inside:avoid}
+  /* Prevent section titles from being orphaned at bottom of page */
+  .sec-title{page-break-after:avoid;page-break-inside:avoid;break-after:avoid}
+  .sub-title{page-break-after:avoid;page-break-inside:avoid;break-after:avoid}
+  /* Keep section content together with its title — avoid leaks */
+  .sec-content{page-break-before:avoid;break-before:avoid}
+  /* Tables: keep header + first row together, allow break within body */
+  table.tbl{page-break-inside:auto;break-inside:auto}
+  table.tbl thead{display:table-header-group}
+  table.tbl tr{page-break-inside:avoid;break-inside:avoid}
+  table.tbl thead tr{page-break-after:avoid;break-after:avoid}
+  /* Risk tables — keep each risk row intact */
+  table.step-tbl tr{page-break-inside:avoid;break-inside:avoid}
+  /* Signature block, QR, footer — never split */
+  .sig-table{page-break-inside:avoid;break-inside:avoid}
+  .qr-block{border-color:#000;background:#fff;page-break-inside:avoid;break-inside:avoid}
+  .footer-line{page-break-inside:avoid;break-inside:avoid}
+  /* Keep images from splitting across pages */
+  img{page-break-inside:avoid;break-inside:avoid}
+  /* Prevent widows/orphans in content paragraphs */
+  p.content{orphans:3;widows:3}
+  .sec-content p,.sec-content div{orphans:2;widows:2}
 }
 `;
 
@@ -820,8 +834,8 @@ function downloadAsDoc(){
   var c=document.querySelector('.page-container').innerHTML;
 
   // ── Clean up HTML for Word compatibility ──
-  // Remove SVG (QR code) — replace with text
-  c = c.replace(/<svg[^>]*>[\\s\\S]*?<\\/svg>/gi, '<span style="font-size:9pt;color:#666">[QR Code]</span>');
+  // Remove SVG (QR code) — convert to descriptive text box for Word
+  c = c.replace(/<svg[^>]*>[\\s\\S]*?<\\/svg>/gi, '<div style="width:120pt;height:120pt;border:2pt solid #000;text-align:center;padding:30pt 10pt;font-size:9pt;font-weight:bold;color:#333;display:inline-block">[QR Code]<br><span style="font-size:7pt;font-weight:normal;color:#666">Scan di versi digital</span></div>');
   // Remove CSS properties Word doesn't support
   c = c.replace(/display\\s*:\\s*(flex|grid|inline-flex|inline-grid)[^;"']*/gi, '');
   c = c.replace(/flex[\\w-]*\\s*:[^;"']*/gi, '');
@@ -843,14 +857,38 @@ function downloadAsDoc(){
   c = c.replace(/style="[\\s;]*"/gi, '');
   // Remove image toolbar artifacts
   c = c.replace(/<div[^>]*class="rte-img-toolbar"[^>]*>[\\s\\S]*?<\\/div>/gi, '');
+  // Remove inline image outlines (editor artifacts)
+  c = c.replace(/outline\\s*:[^;"']*/gi, '');
+  c = c.replace(/outline-offset\\s*:[^;"']*/gi, '');
+
+  // ── Convert flex-based QR block to Word-compatible table layout ──
+  c = c.replace(/<div class="qr-block"[^>]*>([\\s\\S]*?)<\\/div>\\s*<\\/div>\\s*<\\/div>/gi, function(m, inner) {
+    return '<table class="qr-block" style="width:100%;border:1.5pt solid #000;border-collapse:collapse;margin:14pt 0"><tr>' +
+      '<td style="width:130pt;padding:10pt;border:none;vertical-align:top;text-align:center">' +
+      inner.replace(/<div[^>]*style="[^"]*flex-shrink[^"]*"[^>]*>([\\s\\S]*?)<\\/div>/i, '$1') +
+      '</td></tr></table>';
+  });
+
   // Fix footer-line: convert flex layout to table for Word
   c = c.replace(/<div class="footer-line">([\\s\\S]*?)<\\/div>/gi, function(m, inner) {
     var spans = inner.match(/<span[^>]*>[\\s\\S]*?<\\/span>/gi) || [];
     if (spans.length >= 2) {
-      return '<table style="width:100%;border-top:1px solid #ccc;margin-top:20px;border-collapse:collapse"><tr>' +
-        '<td style="padding-top:6px;font-size:7.5pt;color:#888;border:none;text-align:left">' + spans[0].replace(/<\\/?span[^>]*>/gi,'') + '</td>' +
-        '<td style="padding-top:6px;font-size:7.5pt;color:#888;border:none;text-align:right">' + spans[1].replace(/<\\/?span[^>]*>/gi,'') + '</td>' +
+      return '<table style="width:100%;border-top:1pt solid #ccc;margin-top:20pt;border-collapse:collapse"><tr>' +
+        '<td style="padding-top:6pt;font-size:7.5pt;color:#888;border:none;text-align:left">' + spans[0].replace(/<\\/?span[^>]*>/gi,'') + '</td>' +
+        '<td style="padding-top:6pt;font-size:7.5pt;color:#888;border:none;text-align:right">' + spans[1].replace(/<\\/?span[^>]*>/gi,'') + '</td>' +
         '</tr></table>';
+    }
+    return m;
+  });
+
+  // ── Fix cover-meta: convert flex centering to Word margin centering ──
+  c = c.replace(/<div class="cover-meta">/gi, '<div class="cover-meta" style="width:70%;margin:0 auto 40pt;text-align:left">');
+
+  // ── Fix images: ensure all images have proper Word sizing ──
+  c = c.replace(/<img([^>]*)>/gi, function(m, attrs) {
+    // Ensure images have max-width for Word
+    if (attrs.indexOf('max-width') < 0) {
+      return '<img' + attrs + ' style="max-width:100%;height:auto">';
     }
     return m;
   });
@@ -920,8 +958,18 @@ function downloadAsDoc(){
     'ol.step-list{margin:4pt 0 8pt 20pt;font-size:10pt}' +
     'ol.step-list li{margin-bottom:3pt;padding-left:4pt}' +
     '.qr-block{border:1.5pt solid #000;padding:10pt;margin:14pt 0}' +
+    '.qr-block td{border:none;padding:6pt;vertical-align:top}' +
     '.qr-block .qr-text{font-size:8.5pt;color:#333}' +
-    'img{max-width:100%;height:auto}';
+    'img{max-width:100%;height:auto;mso-width-percent:1000;mso-height-percent:0;mso-width-relative:margin}' +
+    /* Ensure section titles don't orphan in Word */
+    '.sec-title{mso-pagination:lines-together;page-break-after:avoid}' +
+    '.sub-title{mso-pagination:lines-together;page-break-after:avoid}' +
+    '.sec-content{mso-pagination:widow-orphan}' +
+    'table.tbl tr{mso-pagination:lines-together}' +
+    '.sig-table{mso-pagination:lines-together}' +
+    '.cover-title-box{mso-element:para-border-div}' +
+    /* Heat map table colors for Word */
+    'td[style*="background"]{mso-pattern:auto none}';
 
   var h='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns:v="urn:schemas-microsoft-com:vml" xmlns="http://www.w3.org/TR/REC-html40">' +
     '<head><meta charset="utf-8"><meta http-equiv="Content-Type" content="text/html; charset=utf-8">' + wordMeta +

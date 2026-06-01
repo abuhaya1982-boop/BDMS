@@ -433,6 +433,8 @@ async function saveSectionConfig() {
     await API.updateTemplate(id, { konten, perubahan: 'Perubahan konfigurasi seksi template' });
     closeModal('modalGeneric');
     showToast('Konfigurasi seksi disimpan — perubahan akan berlaku untuk dokumen IK baru', 'success');
+    // Signal template change — IK form will detect and offer refresh
+    window._templateLastUpdated = Date.now();
     showPage('template');
   } catch (e) { showToast('Gagal: ' + e.message, 'error'); }
 }
@@ -489,7 +491,8 @@ async function activateTemplate(id) {
   if (!confirm('Aktifkan template ini? Template aktif sebelumnya akan menjadi Legacy.')) return;
   try {
     await API.updateTemplate(id, { status: 'Aktif' });
-    showToast('Template diaktifkan', 'success');
+    showToast('Template diaktifkan — dokumen IK baru akan menggunakan template ini', 'success');
+    window._templateLastUpdated = Date.now();
     showPage('template');
   } catch (e) { showToast('Gagal: ' + e.message, 'error'); }
 }

@@ -1,6 +1,7 @@
 // Buat IK — Template-Driven WYSIWYG Editor
 let editingDocId = null, pendingEditId = null;
 let activeTemplate = null, activeTemplateSections = [];
+let _tplLoadedAt = 0; // timestamp when template was loaded into this form
 
 // ═══════════════════════════════════════════════
 // RICH TEXT TOOLBAR — lightweight contenteditable
@@ -822,6 +823,9 @@ async function renderBuatIK(container) {
     activeTemplateSections = (typeof DEFAULT_SECTIONS !== 'undefined' ? DEFAULT_SECTIONS : []).map(s => ({ ...s, enabled: true }));
   }
 
+  // Track when template was loaded for sync detection
+  _tplLoadedAt = Date.now();
+
   // Build section HTML — fully driven by template config
   let sectionsHtml = '';
 
@@ -855,11 +859,17 @@ async function renderBuatIK(container) {
         ${editingDocId && docTemplateVersi ? `<span style="font-size:11px;color:var(--text-tertiary);background:var(--bg-secondary);padding:2px 8px;border-radius:4px">${icon('layout-template', 12)} Template: ${esc(docTemplateVersi)}</span>` : (activeTemplate ? `<span style="font-size:11px;color:var(--text-tertiary);background:var(--bg-secondary);padding:2px 8px;border-radius:4px">${icon('layout-template', 12)} ${esc(activeTemplate.nama)} (${esc(activeTemplate.versi)})</span>` : '')}
         ${canUpgradeTemplate ? `<button class="btn btn-sm" style="font-size:11px;background:#FFF3E0;color:#E65100;border:1px solid #FFB74D" onclick="upgradeDocTemplate(${editingDocId})">${icon('refresh-cw', 12)} Upgrade ke ${esc(activeTemplate.versi)}</button>` : ''}
       </div>
-      <div style="display:flex;gap:6px">
+      <div style="display:flex;gap:6px;align-items:center">
+        ${!editingDocId ? `<button class="btn btn-ghost btn-sm" onclick="reloadActiveTemplate()" title="Muat ulang template aktif dari server" style="font-size:11px;color:var(--text-tertiary)">${icon('refresh-cw', 13)} Sync Template</button>` : ''}
         <button class="btn btn-secondary btn-sm" onclick="saveDraft()">${icon('save', 14)} Draft</button>
         <button class="btn btn-primary btn-sm" onclick="submitIK()">${icon('upload', 14)} Submit</button>
       </div>
     </div>
+    ${activeTemplate ? `<div style="background:#EBF5FF;border:1px solid #B3D4FC;border-radius:6px;padding:6px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px;font-size:11px;color:#1565C0">
+      ${icon('layout-template', 14)}
+      <span>Form ini menggunakan template <strong>${esc(activeTemplate.nama)}</strong> versi <strong>${esc(activeTemplate.versi)}</strong> — ${activeTemplateSections.length} seksi aktif</span>
+      ${editingDocId && canUpgradeTemplate ? `<span style="color:#E65100;font-weight:600">| Template terbaru tersedia</span>` : ''}
+    </div>` : ''}
     <div class="wysiwyg-doc" id="docPaper">
       ${sectionsHtml}
     </div>
@@ -1528,6 +1538,31 @@ async function saveDraft() {
       showToast('Draft tersimpan — No. ' + (res.data?.nomor_dokumen || ''), 'success');
     }
   } catch (e) { console.error('saveDraft error:', e); showToast('Gagal menyimpan: ' + e.message, 'error'); }
+}
+
+// ════════════════════════════════════════════
+//  TEMPLATE SYNC — Detect template changes
+// ════════════════════════════════════════════
+async function reloadActiveTemplate() {
+  if (editingDocId) {
+    showToast('Template sync hanya berlaku untuk dokumen baru. Gunakan "Upgrade Template" untuk dokumen existing.', 'warning');
+    return;
+  }
+  try {
+    const tplRes = await API.getActiveTemplate();
+    activeTemplate = tplRes.data;
+    const parsed = activeTemplate.konten ? JSON.parse(activeTemplate.konten) : [];
+    activeTemplateSections = parsed.filter(s => s.enabled !== false);
+    if (activeTemplateSections.length === 0) {
+      activeTemplateSections = (typeof DEFAULT_SECTIONS !== 'undefined' ? DEFAULT_SECTIONS : []).map(s => ({ ...s, enabled: true }));
+    }
+    _tplLoadedAt = Date.now();
+    showToast('Template dimuat ulang: ' + activeTemplate.nama + ' (' + activeTemplate.versi + ')', 'success');
+    // Re-render the entire form (will lose unsaved changes)
+    renderBuatIK(document.getElementById('appContent'));
+  } catch (e) {
+    showToast('Gagal memuat template: ' + e.message, 'error');
+  }
 }
 
 async function submitIK() {
