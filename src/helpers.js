@@ -28,6 +28,8 @@ function requireAuth(req, res, next) {
 function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.session?.user_id) return unauthorized(res);
+    // Super Admin always has access (check both current and original role)
+    if (req.session.original_role === 'Super Admin') return next();
     if (req.session.role === 'Super Admin') return next();
     if (!roles.includes(req.session.role)) return forbidden(res, 'Anda tidak memiliki akses');
     next();

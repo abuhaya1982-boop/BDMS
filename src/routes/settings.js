@@ -1,50 +1,99 @@
 // Settings API
 const router = require('express').Router();
-const { getDB } = require('../db');
+const path = require('path');
+const fs = require('fs');
+const { getDB, _reset } = require('../db');
 const h = require('../helpers');
 
-// Get all settings
-router.get('/', h.requireAuth, (req, res) => {
-  const settings = getDB().prepare("SELECT * FROM settings ORDER BY grup, kunci").all();
-  // Group by grup
-  const grouped = {};
-  for (const s of settings) {
-    if (!grouped[s.grup]) grouped[s.grup] = [];
-    grouped[s.grup].push(s);
-  }
-  h.success(res, grouped);
-});
-
-// Get single setting
-router.get('/:kunci', h.requireAuth, (req, res) => {
-  const setting = getDB().prepare("SELECT * FROM settings WHERE kunci=?").get(req.params.kunci);
-  if (!setting) return h.notFound(res);
-  h.success(res, setting);
-});
-
-// Update setting(s)
-router.put('/', h.requireRole('Admin', 'Super Admin'), (req, res) => {
-  const { settings } = req.body;
-  if (!settings || !Array.isArray(settings)) return h.error(res, 'Format settings tidak valid');
+// Helper: get all settings as flat key-value object
+function getSettingsFlat() {
   const db = getDB();
-  const stmt = db.prepare("UPDATE settings SET nilai=?, updated_at=datetime('now','localtime') WHERE kunci=?");
+  const rows = db.prepare("SELECT key, value FROM settings").all();
+  const obj = {};
+  for (const r of rows) {
+    try { obj[r.key] = JSON.parse(r.value); } catch { obj[r.key] = r.value; }
+  }
+  return obj;
+}
+
+// GET /api/settings — return flat key-value object
+router.get('/', h.requireAuth, (req, res) => {
+  h.success(res, getSettingsFlat());
+});
+
+// GET /api/settings/db-stats
+router.get('/db-stats', h.requireAuth, (req, res) => {
+  const db = getDB();
+  const documents = db.prepare("SELECT COUNT(*) as c FROM ik_documents").get().c;
+  const users = db.prepare("SELECT COUNT(*) as c FROM users").get().c;
+  const templates = db.prepare("SELECT COUNT(*) as c FROM templates").get().c;
+  const equipment = db.prepare("SELECT COUNT(*) as c FROM equipment").get().c;
+  const audit_logs = db.prepare("SELECT COUNT(*) as c FROM audit_trails").get().c;
+  const dbPath = path.join(__dirname, '../../database/bdms.db');
+  let db_size = '?';
+  try {
+    const stats = fs.statSync(dbPath);
+    const kb = Math.round(stats.size / 1024);
+    db_size = kb > 1024 ? `${(kb / 1024).toFixed(1)} MB` : `${kb} KB`;
+  } catch {}
+  h.success(res, { documents, users, templates, equipment, audit_logs, db_size });
+});
+
+// GET /api/settings/export — export all data as JSON
+router.get('/export', h.requireRole('Admin', 'Super Admin'), (req, res) => {
+  const db = getDB();
+  h.success(res, {
+    settings: getSettingsFlat(),
+    users: db.prepare("SELECT id,nama,nid,email,jabatan,unit_id,role,status FROM users").all(),
+    units: db.prepare("SELECT * FROM units").all(),
+    probis: db.prepare("SELECT * FROM probis").all(),
+    templates: db.prepare("SELECT * FROM templates").all(),
+    documents: db.prepare("SELECT * FROM ik_documents").all(),
+    equipment: db.prepare("SELECT * FROM equipment").all(),
+    roles: db.prepare("SELECT * FROM roles").all(),
+    exported_at: new Date().toISOString()
+  });
+});
+
+// POST /api/settings — save flat key-value object from frontend
+router.post('/', h.requireRole('Admin', 'Super Admin'), (req, res) => {
+  const db = getDB();
+  const body = req.body;
+  if (!body || typeof body !== 'object') return h.error(res, 'Format tidak valid');
+
+  const upsert = db.prepare(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now','localtime'))
+    ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`);
+
   let updated = 0;
-  for (const { kunci, nilai } of settings) {
-    if (kunci) { stmt.run(nilai, kunci); updated++; }
+  for (const [key, value] of Object.entries(body)) {
+    const val = typeof value === 'object' ? JSON.stringify(value) : String(value);
+    upsert.run(key, val);
+    updated++;
   }
   h.logAudit(req, 'UPDATE_SETTINGS', `${updated} pengaturan diperbarui`, 'setting');
-  h.success(res, { updated }, 'Pengaturan berhasil disimpan');
+  h.success(res, getSettingsFlat(), 'Pengaturan disimpan');
 });
 
-// Update single setting
-router.put('/:kunci', h.requireRole('Admin', 'Super Admin'), (req, res) => {
+// POST /api/settings/reset-db — reset database
+router.post('/reset-db', h.requireRole('Super Admin'), (req, res) => {
+  try {
+    _reset();
+    const dbPath = path.join(__dirname, '../../database/bdms.db');
+    if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
+    // Next getDB() call will re-init
+    h.success(res, null, 'Database berhasil direset');
+  } catch (e) {
+    h.error(res, 'Gagal reset database: ' + e.message);
+  }
+});
+
+// PUT /api/settings/:key — update single setting
+router.put('/:key', h.requireRole('Admin', 'Super Admin'), (req, res) => {
   const { nilai } = req.body;
   if (nilai === undefined) return h.error(res, 'Nilai wajib');
-  const db = getDB();
-  const existing = db.prepare("SELECT * FROM settings WHERE kunci=?").get(req.params.kunci);
-  if (!existing) return h.notFound(res);
-  db.prepare("UPDATE settings SET nilai=?, updated_at=datetime('now','localtime') WHERE kunci=?").run(nilai, req.params.kunci);
-  h.logAudit(req, 'UPDATE_SETTING', `Setting ${req.params.kunci} diubah`, 'setting');
+  getDB().prepare(`INSERT INTO settings (key, value, updated_at) VALUES (?, ?, datetime('now','localtime'))
+    ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`)
+    .run(req.params.key, typeof nilai === 'object' ? JSON.stringify(nilai) : String(nilai));
   h.success(res, null, 'Pengaturan berhasil disimpan');
 });
 

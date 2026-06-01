@@ -89,6 +89,11 @@ router.get('/me', h.requireAuth, (req, res) => {
   if (!user) return h.notFound(res, 'User tidak ditemukan');
   user.password_change_required = !!user.password_change_required;
   user.must_set_password = !!user.must_set_password;
+  user.original_role = req.session.original_role || user.role;
+  // If Super Admin switched role, show the switched role
+  if (req.session.role && req.session.role !== user.role) {
+    user.role = req.session.role;
+  }
   user.permissions = h.getUserPermissions(user.id);
   user.roles = h.getUserRoles(user.id);
   h.success(res, user);

@@ -356,4 +356,9 @@ function autoInit(db) {
   console.log('Database initialized successfully');
 }
 
-module.exports = { getDB };
+function _reset() {
+  if (_db) { try { _db.close(); } catch {} }
+  _db = null;
+}
+
+module.exports = { getDB, _reset };
