@@ -4,6 +4,12 @@ const session = require('express-session');
 const path = require('path');
 const app = express();
 
+const fs = require('fs');
+
+// Ensure database directory exists before anything tries to use it
+const dbDir = path.join(__dirname, 'database');
+if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+
 // Session store (SQLite-backed)
 const SQLiteStore = require('connect-sqlite3')(session);
 
@@ -11,8 +17,11 @@ const SQLiteStore = require('connect-sqlite3')(session);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Trust proxy (Hostinger uses reverse proxy)
+app.set('trust proxy', 1);
+
 app.use(session({
-  store: new SQLiteStore({ db: 'sessions.db', dir: path.join(__dirname, 'database') }),
+  store: new SQLiteStore({ db: 'sessions.db', dir: dbDir }),
   secret: process.env.SESSION_SECRET || 'bdms-brantas-secret-2025',
   resave: false,
   saveUninitialized: false,
@@ -20,7 +29,7 @@ app.use(session({
     maxAge: 86400000, // 24 hours
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production'
+    secure: 'auto' // auto-detect HTTPS via trust proxy
   }
 }));
 
