@@ -1046,9 +1046,13 @@ async function previewDocNumber() {
   }
   try {
     const res = await API.get('dokumen/preview-number?unit_id=' + unitId + '&probis_id=' + probisId);
-    if (res.data?.nomor_dokumen) {
+    const previewNum = res.data?.preview || res.data?.nomor_dokumen;
+    if (previewNum) {
       const display = document.getElementById('kopNomorDisplay');
-      if (display) display.innerHTML = `<strong style="color:var(--text-tertiary)">${esc(res.data.nomor_dokumen)}</strong> <span style="font-size:10px;color:var(--text-tertiary)">(preview)</span>`;
+      if (display) display.innerHTML = `<strong style="color:var(--primary)">${esc(previewNum)}</strong> <span style="font-size:10px;color:var(--text-tertiary)">(preview)</span>`;
+      // Also show in the toolbar
+      const pageDisplay = document.getElementById('docNumDisplay');
+      if (pageDisplay) pageDisplay.textContent = previewNum + ' (preview)';
     }
   } catch (e) { /* silent preview failure */ }
 }
