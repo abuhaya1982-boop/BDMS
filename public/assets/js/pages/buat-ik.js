@@ -833,28 +833,30 @@ async function renderBuatIK(container) {
   // Track when template was loaded for sync detection
   _tplLoadedAt = Date.now();
 
-  // Build section HTML — fully driven by template config
+  // Build section HTML — fully driven by template config, RESPECTING TEMPLATE ORDER
   let sectionsHtml = '';
 
   // Kop is always rendered (non-configurable)
   sectionsHtml += renderKop();
 
-  // Separate aktivitas sections from the rest
+  // Collect aktivitas sections for grouped tab rendering
   const aktivitasSections = activeTemplateSections.filter(s => s.id.startsWith('aktivitas_'));
-  const nonAktivitasSections = activeTemplateSections.filter(s => !s.id.startsWith('aktivitas_'));
+  let aktivitasRendered = false;
 
-  // Render non-aktivitas sections in template order
-  for (const section of nonAktivitasSections) {
-    if (section.id === 'change_history') {
+  // Render ALL sections in template order
+  for (const section of activeTemplateSections) {
+    if (section.id.startsWith('aktivitas_')) {
+      // Render the grouped aktivitas tabs block at the position of the FIRST aktivitas section
+      if (!aktivitasRendered && aktivitasSections.length > 0) {
+        sectionsHtml += renderDetailAktivitas(aktivitasSections);
+        aktivitasRendered = true;
+      }
+      // Skip subsequent aktivitas sections (already rendered as tabs)
+    } else if (section.id === 'change_history') {
       sectionsHtml += renderChangeHistory(section);
     } else {
       sectionsHtml += renderSectionByConfig(section);
     }
-  }
-
-  // Render aktivitas sections grouped with tabs
-  if (aktivitasSections.length > 0) {
-    sectionsHtml += renderDetailAktivitas(aktivitasSections);
   }
 
   container.innerHTML = `

@@ -627,10 +627,34 @@ table.step-tbl li{margin-bottom:1px}
 
   // Collect aktivitas sections for grouped rendering
   const aktivitasSections = tplSections.filter(s => s.id.startsWith('aktivitas_'));
-  const nonAktivitasSections = tplSections.filter(s => !s.id.startsWith('aktivitas_') && s.id !== 'change_history');
+  let aktivitasRendered = false;
 
-  // Render non-aktivitas sections in template order
-  for (const sec of nonAktivitasSections) {
+  // Helper: render the grouped aktivitas block
+  const renderAktivitasBlock = () => {
+    const hasAktivitas = aktivitasSections.some(s => hasAktivitasContent(steps[s.id]));
+    if (!hasAktivitas) return;
+    body += `<div class="sec-title"><span class="sec-num">${secNum}.</span>Detail Aktivitas</div>`;
+    for (const sec of aktivitasSections) {
+      const tabLabel = sec.label.replace(/^Aktivitas\s*/i, '') || sec.label;
+      body += renderAktSectionPrint(steps[sec.id], tabLabel);
+    }
+    secNum++;
+  };
+
+  // Render ALL sections in TEMPLATE ORDER (respect user's configured order)
+  for (const sec of tplSections) {
+    // Skip change_history (rendered on page 2)
+    if (sec.id === 'change_history') continue;
+
+    // Aktivitas sections: render grouped block at position of FIRST aktivitas section
+    if (sec.id.startsWith('aktivitas_')) {
+      if (!aktivitasRendered) {
+        renderAktivitasBlock();
+        aktivitasRendered = true;
+      }
+      continue; // skip subsequent aktivitas sections
+    }
+
     const secLabel = escH(sec.label);
 
     switch (sec.id) {
@@ -765,17 +789,6 @@ table.step-tbl li{margin-bottom:1px}
         break;
       }
     }
-  }
-
-  // ── Aktivitas sections (grouped) ──
-  const hasAktivitas = aktivitasSections.some(s => hasAktivitasContent(steps[s.id]));
-  if (hasAktivitas) {
-    body += `<div class="sec-title"><span class="sec-num">${secNum}.</span>Detail Aktivitas</div>`;
-    for (const sec of aktivitasSections) {
-      const tabLabel = sec.label.replace(/^Aktivitas\s*/i, '') || sec.label;
-      body += renderAktSectionPrint(steps[sec.id], tabLabel);
-    }
-    secNum++;
   }
 
   // QR Code & Cloud Path

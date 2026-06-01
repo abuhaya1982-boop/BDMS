@@ -286,10 +286,12 @@ function renderSectionConfigInner(sections) {
 // ─── EDIT SECTION DETAIL (Label, Type, Columns) ───
 function editSectionDetail(idx) {
   const s = window._tplSectionsEdit[idx];
-  if (!s) return;
+  if (!s) { showToast('Seksi tidak ditemukan (index: ' + idx + ')', 'error'); return; }
 
+  // Determine if type can be changed (special & risk_matrix are locked for built-in sections)
+  const isTypeLocked = !s.custom && ['special', 'risk_matrix'].includes(s.type);
   const typeOpts = SECTION_TYPES.map(t =>
-    `<option value="${t.value}" ${s.type === t.value ? 'selected' : ''}>${t.label}</option>`
+    `<option value="${t.value}" ${s.type === t.value ? 'selected' : ''} ${isTypeLocked && t.value !== s.type ? 'disabled' : ''}>${t.label}</option>`
   ).join('');
 
   const colsVal = s.columns ? s.columns.join(', ') : '';
@@ -297,7 +299,7 @@ function editSectionDetail(idx) {
   // Build inline editor in a sub-modal style (replace config list temporarily)
   const editHtml = `
   <div style="background:var(--surface-2);border:1px solid var(--border-light);border-radius:8px;padding:16px;margin-bottom:12px" id="sectionEditPanel">
-    <div style="font-weight:700;font-size:14px;margin-bottom:12px">${icon('edit-3', 14)} Edit Seksi: ${esc(s.label)}</div>
+    <div style="font-weight:700;font-size:14px;margin-bottom:12px">${icon('edit-3', 14)} Edit Seksi: ${esc(s.label)} ${isTypeLocked ? '<span style="font-size:11px;color:var(--text-tertiary);font-weight:400">(tipe tidak dapat diubah)</span>' : ''}</div>
     <div class="form-grid" style="gap:10px">
       <div class="form-group">
         <label class="form-label">Label Seksi <span class="required">*</span></label>
@@ -305,7 +307,7 @@ function editSectionDetail(idx) {
       </div>
       <div class="form-group">
         <label class="form-label">Tipe Input</label>
-        <select class="form-control" id="sec-edit-type" onchange="onSectionTypeChange()">${typeOpts}</select>
+        <select class="form-control" id="sec-edit-type" onchange="onSectionTypeChange()" ${isTypeLocked ? 'disabled' : ''}>${typeOpts}</select>
         <div style="font-size:10px;color:var(--text-tertiary);margin-top:4px" id="sec-edit-type-desc">${esc(SECTION_TYPES.find(t => t.value === s.type)?.desc || '')}</div>
       </div>
       <div class="form-group full" id="sec-edit-cols-wrap" style="${s.type === 'table' ? '' : 'display:none'}">
@@ -328,11 +330,23 @@ function editSectionDetail(idx) {
     </div>
   </div>`;
 
-  // Insert above the config list
+  // Insert above the config list and scroll into view
   const existing = document.getElementById('sectionEditPanel');
   if (existing) existing.remove();
   const list = document.getElementById('sectionConfigList');
-  if (list) list.insertAdjacentHTML('beforebegin', editHtml);
+  if (list) {
+    list.insertAdjacentHTML('beforebegin', editHtml);
+    // Scroll the edit panel into view within the modal
+    const panel = document.getElementById('sectionEditPanel');
+    if (panel) {
+      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      // Focus the label input for quick editing
+      setTimeout(() => {
+        const labelInput = document.getElementById('sec-edit-label');
+        if (labelInput) labelInput.focus();
+      }, 100);
+    }
+  }
   renderIcons();
 }
 
@@ -348,14 +362,15 @@ function saveSectionDetail(idx) {
   const s = window._tplSectionsEdit[idx];
   if (!s) return;
   const label = document.getElementById('sec-edit-label')?.value?.trim();
-  const type = document.getElementById('sec-edit-type')?.value;
+  const typeEl = document.getElementById('sec-edit-type');
+  const type = typeEl?.disabled ? s.type : typeEl?.value; // keep original if locked
   const colsRaw = document.getElementById('sec-edit-cols')?.value?.trim();
   const reqEl = document.getElementById('sec-edit-required');
 
   if (!label) { showToast('Label seksi wajib diisi', 'error'); return; }
 
   s.label = label;
-  s.type = type;
+  if (!typeEl?.disabled) s.type = type; // only update type if not locked
   if (type === 'table' && colsRaw) {
     s.columns = colsRaw.split(',').map(c => c.trim()).filter(Boolean);
   } else if (type !== 'table') {
