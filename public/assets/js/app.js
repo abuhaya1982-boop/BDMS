@@ -107,7 +107,7 @@ async function doForgotPassword() {
 // Sesuai Template IK Tahun 2025
 // ═══════════════════════════════════════════════════════════════
 
-async function downloadPdf(id) { await downloadDocx(id); }
+async function downloadPdf(id) { await previewDokumenFull(id, 'pdf'); }
 
 async function downloadDocx(id) {
   try {
@@ -134,8 +134,40 @@ async function downloadDocx(id) {
   }
 }
 
-// Legacy alias — kept for backward compatibility
-async function previewDokumenFull(id, mode) { await downloadDocx(id); }
+async function previewDokumenFull(id, mode) {
+  try {
+    const res = await API.getDokumenById(id);
+    const d = res.data;
+    const unit = d.unit_nama || '';
+    const probis = d.probis_nama || '';
+    const owner = d.owner_nama || '';
+
+    let cloudBaseUrl = '';
+    try { const settRes = await API.getSettings(); cloudBaseUrl = settRes.data?.cloud_base_url || ''; } catch(e) { /* ignore */ }
+
+    const gdrivePath = cloudBaseUrl
+      ? `${cloudBaseUrl.replace(/\/+$/,'')}/${unit.replace(/\s+/g,'_')}/${d.nomor_dokumen}/`
+      : `G:/IMS_UP_Brantas/Instruksi_Kerja/${unit.replace(/\s+/g,'_')}/${d.nomor_dokumen}/`;
+
+    const qrData = cloudBaseUrl ? `${gdrivePath}` : `BDMS|${d.nomor_dokumen}|Rev${d.revisi||'00'}|${unit}`;
+    const qrSvg = generateQRCodeSVG(qrData, 150);
+
+    const konten = d.konten || {};
+    const steps = d.steps || konten.steps || {};
+    const logoB64 = typeof LOGO_PLN_NP_B64 !== 'undefined' ? LOGO_PLN_NP_B64 : '';
+    const html = buildPrintableDoc(d, { unit, probis, owner, gdrivePath, qrSvg, steps, konten, logoB64 });
+    const w = window.open('', '_blank');
+    if (!w) { showToast('Pop-up diblokir browser. Izinkan pop-up untuk preview.', 'error'); return; }
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    if (mode === 'pdf') setTimeout(() => w.print(), 600);
+    showToast(`Preview: ${d.nomor_dokumen}`, 'success');
+  } catch (e) {
+    console.error('previewDokumenFull error:', e);
+    showToast('Gagal memuat dokumen: ' + (e.message || JSON.stringify(e)), 'error');
+  }
+}
 
 function escH(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDate(d) { if (!d) return '-'; try { return new Date(d).toLocaleDateString('id-ID',{day:'2-digit',month:'2-digit',year:'numeric'}); } catch { return d; } }

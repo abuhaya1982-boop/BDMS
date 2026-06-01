@@ -144,7 +144,7 @@ function renderIKRows(docs, cols) {
       <td style="text-align:center">
         <div style="display:flex;gap:2px;justify-content:center">
           <button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" onclick="viewDocDetail(${d.id})">${icon('eye', 14)}</button>
-          ${d.status === 'Published' ? `<button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" onclick="downloadDocx(${d.id})">${icon('download', 14)}</button>` : ''}
+          ${d.status === 'Published' ? `<button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" onclick="downloadDocx(${d.id})" title="Download DOCX">${icon('download', 14)}</button>` : ''}
         </div>
       </td>
     `);
@@ -292,7 +292,9 @@ async function viewDocDetail(id) {
       </div>
       `,
       `<button class="btn btn-secondary btn-sm" onclick="closeModal('modalGeneric')">Tutup</button>
-       <button class="btn btn-secondary btn-sm" onclick="closeModal('modalGeneric');downloadDocx(${d.id})">${icon('download', 14)} Download DOCX</button>
+       <button class="btn btn-secondary btn-sm" onclick="closeModal('modalGeneric');previewDokumenFull(${d.id})">${icon('eye', 14)} Preview</button>
+       <button class="btn btn-secondary btn-sm" onclick="closeModal('modalGeneric');previewDokumenFull(${d.id},'pdf')">${icon('printer', 14)} PDF</button>
+       <button class="btn btn-primary btn-sm" onclick="closeModal('modalGeneric');downloadDocx(${d.id})">${icon('download', 14)} DOCX</button>
        ${d.status === 'Draft' ? `<button class="btn btn-primary btn-sm" onclick="closeModal('modalGeneric');editDokumen(${d.id})">${icon('edit-3', 14)} Edit</button>` : ''}`
     );
     renderIcons();
