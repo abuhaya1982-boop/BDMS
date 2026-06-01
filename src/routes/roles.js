@@ -22,6 +22,7 @@ router.get('/:id', h.requireAuth, (req, res) => {
   const role = db.prepare("SELECT * FROM roles WHERE id=?").get(req.params.id);
   if (!role) return h.notFound(res);
   role.permissions = db.prepare(`SELECT p.* FROM role_permissions rp JOIN permissions p ON rp.permission_id = p.id WHERE rp.role_id=?`).all(role.id);
+  role.permission_ids = role.permissions.map(p => p.id);
   h.success(res, role);
 });
 
@@ -70,7 +71,16 @@ router.delete('/:id', h.requireRole('Super Admin'), (req, res) => {
 
 // ─── PERMISSIONS ───
 permissions.get('/', h.requireAuth, (req, res) => {
-  h.success(res, getDB().prepare("SELECT * FROM permissions ORDER BY grup, kode").all());
+  const rows = getDB().prepare("SELECT * FROM permissions ORDER BY grup, kode").all();
+  // Group by grup — frontend expects [{grup, permissions:[{id,nama,kode,...}]}]
+  const grouped = [];
+  const map = {};
+  for (const p of rows) {
+    const g = p.grup || 'Lainnya';
+    if (!map[g]) { map[g] = { grup: g, permissions: [] }; grouped.push(map[g]); }
+    map[g].permissions.push(p);
+  }
+  h.success(res, grouped);
 });
 
 router.permissions = permissions;
