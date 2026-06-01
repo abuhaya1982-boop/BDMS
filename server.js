@@ -23,24 +23,16 @@ app.set('trust proxy', 1);
 app.use(session({
   store: new SQLiteStore({ db: 'sessions.db', dir: dbDir }),
   secret: process.env.SESSION_SECRET || 'bdms-brantas-secret-2025',
+  name: 'bdms.sid',
   resave: false,
   saveUninitialized: false,
   cookie: {
     maxAge: 86400000, // 24 hours
     httpOnly: true,
-    sameSite: 'lax',
-    secure: 'auto' // auto-detect HTTPS via trust proxy
+    sameSite: 'strict', // same-site only — prevents tracking prevention issues
+    secure: false // Hostinger proxy handles HTTPS termination
   }
 }));
-
-// CORS headers
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  if (req.method === 'OPTIONS') return res.sendStatus(204);
-  next();
-});
 
 // Serve static frontend files (no cache for HTML, short cache for assets)
 app.use(express.static(path.join(__dirname, 'public'), {
