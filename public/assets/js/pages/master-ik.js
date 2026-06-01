@@ -294,11 +294,12 @@ async function viewDocDetail(id) {
       `<button class="btn btn-secondary btn-sm" onclick="closeModal('modalGeneric')">Tutup</button>
        <button class="btn btn-secondary btn-sm" onclick="closeModal('modalGeneric');previewDokumenFull(${d.id})">${icon('eye', 14)} Preview</button>
        <button class="btn btn-secondary btn-sm" onclick="closeModal('modalGeneric');previewDokumenFull(${d.id},'pdf')">${icon('printer', 14)} PDF</button>
-       ${d.status === 'Draft' ? `<button class="btn btn-primary btn-sm" onclick="closeModal('modalGeneric');showPage('buat-ik');editDokumen(${d.id})">${icon('edit-3', 14)} Edit</button>` : ''}`
+       ${d.status === 'Draft' ? `<button class="btn btn-primary btn-sm" onclick="closeModal('modalGeneric');editDokumen(${d.id})">${icon('edit-3', 14)} Edit</button>` : ''}`
     );
     renderIcons();
   } catch (e) {
-    showToast('Gagal memuat detail dokumen', 'error');
+    console.error('[MasterIK] viewDocDetail error:', e);
+    showToast('Gagal memuat detail dokumen: ' + e.message, 'error');
   }
 }
 

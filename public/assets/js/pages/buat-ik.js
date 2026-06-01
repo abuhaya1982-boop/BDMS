@@ -774,7 +774,9 @@ function switchDocTab(tabId, btn) {
 // ═══════════════════════════════════════════════
 // MAIN RENDER (Template-Driven)
 // ═══════════════════════════════════════════════
+let _renderBuatIKVersion = 0; // guard against concurrent renders
 async function renderBuatIK(container) {
+  const thisRender = ++_renderBuatIKVersion; // each render gets a unique version
   editingDocId = pendingEditId; pendingEditId = null;
 
   let docSnapshot = null;
@@ -829,6 +831,9 @@ async function renderBuatIK(container) {
   if (activeTemplateSections.length === 0) {
     activeTemplateSections = (typeof DEFAULT_SECTIONS !== 'undefined' ? DEFAULT_SECTIONS : []).map(s => ({ ...s, enabled: true }));
   }
+
+  // Guard: if a newer render started while we were awaiting, abort this one
+  if (thisRender !== _renderBuatIKVersion) { console.log('[BuatIK] Render cancelled — superseded by newer render'); return; }
 
   // Track when template was loaded for sync detection
   _tplLoadedAt = Date.now();
@@ -1209,7 +1214,10 @@ async function loadDokumenForEdit(id) {
 
     showToast('Data dokumen dimuat', 'success');
     attachAutoGrow(); renderIcons();
-  } catch (e) { showToast('Gagal memuat: ' + e.message, 'error'); }
+  } catch (e) {
+    console.error('[BuatIK] loadDokumenForEdit error:', e);
+    showToast('Gagal memuat: ' + e.message, 'error');
+  }
 }
 
 function loadCustomSectionData(section, customSections) {

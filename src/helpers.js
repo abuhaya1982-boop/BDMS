@@ -86,7 +86,7 @@ function getDeviceName(ua = '') {
   return 'Unknown';
 }
 
-function generateDocNumber(kodeDokumen, unitKode, probisNo, seq) {
+function generateDocNumber(kodeDokumen, probisNo, seq) {
   return `${kodeDokumen}-${probisNo}-${String(seq).padStart(3, '0')}`;
 }
 

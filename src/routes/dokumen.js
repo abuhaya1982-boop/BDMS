@@ -101,9 +101,10 @@ router.get('/:id', h.requireAuth, (req, res) => {
 
     const definisi = db.prepare('SELECT * FROM ik_definisi WHERE dokumen_id=?').all(id);
     const dokTerkaitAll = db.prepare('SELECT * FROM ik_dokumen_terkait WHERE dokumen_id=?').all(id);
-    const dokumen_pendukung = dokTerkaitAll.filter(d => d.tipe === 'Pendukung');
-    const dokumen_referensi = dokTerkaitAll.filter(d => d.tipe === 'Referensi');
-    const dokumen_perizinan = dokTerkaitAll.filter(d => d.tipe === 'Perizinan');
+    // Map DB rows to frontend-expected keys: pendukung uses 'nomor', referensi/perizinan use 'nama'
+    const dokumen_pendukung = dokTerkaitAll.filter(d => d.tipe === 'Pendukung').map(d => ({ id: d.id, nomor: d.konten }));
+    const dokumen_referensi = dokTerkaitAll.filter(d => d.tipe === 'Referensi').map(d => ({ id: d.id, nama: d.konten }));
+    const dokumen_perizinan = dokTerkaitAll.filter(d => d.tipe === 'Perizinan').map(d => ({ id: d.id, nama: d.konten }));
     const sdm = db.prepare('SELECT * FROM ik_sdm WHERE dokumen_id=?').all(id);
     const tools = db.prepare('SELECT * FROM ik_tools WHERE dokumen_id=?').all(id);
     const material = db.prepare('SELECT * FROM ik_material WHERE dokumen_id=?').all(id);
@@ -122,7 +123,11 @@ router.get('/:id', h.requireAuth, (req, res) => {
     // Parse change_history from steps
     let change_history = [];
     if (steps.change_history) {
-      try { change_history = JSON.parse(steps.change_history); } catch {}
+      if (Array.isArray(steps.change_history)) {
+        change_history = steps.change_history;
+      } else {
+        try { change_history = JSON.parse(steps.change_history); } catch {}
+      }
     }
 
     h.success(res, {
@@ -138,7 +143,10 @@ router.get('/:id', h.requireAuth, (req, res) => {
       dokumen_perizinan,
       sdm, tools, material, formulir, risiko, approvals
     });
-  } catch (err) { h.error(res, err.message); }
+  } catch (err) {
+    console.error('GET /dokumen/:id error:', err);
+    h.error(res, err.message);
+  }
 });
 
 // ── Helper: save steps (object) into ik_steps table + konten JSON ──
