@@ -1,436 +1,171 @@
-const express = require('express');
-const router = express.Router();
+// Workflow API — 3-Tier Approval
+const router = require('express').Router();
 const { getDB } = require('../db');
-const {
-  success, error, notFound, forbidden,
-  requireAuth, logAudit, notify
-} = require('../helpers');
+const h = require('../helpers');
 
-// GET / — Get workflow documents with optional status filter
-router.get('/', requireAuth, (req, res) => {
+// GET / — List workflow documents
+router.get('/', h.requireAuth, (req, res) => {
   try {
     const db = getDB();
     const { status } = req.query;
+    let where = "WHERE d.status != 'Draft'";
     const params = [];
-    let where = '';
-
-    if (status) {
-      where = 'WHERE d.status = ?';
-      params.push(status);
-    } else {
-      where = "WHERE d.status != 'Draft'";
-    }
+    if (status) { where = 'WHERE d.status = ?'; params.push(status); }
 
     const items = db.prepare(`
-      SELECT d.*, u.nama as unit_nama, p.nama as probis_nama,
-             usr.nama as owner_nama, usr.email as owner_email
-      FROM ik_documents d
-      LEFT JOIN units u ON u.id = d.unit_id
-      LEFT JOIN probis p ON p.id = d.probis_id
-      LEFT JOIN users usr ON usr.id = d.owner_id
-      ${where}
-      ORDER BY d.updated_at DESC
+      SELECT d.*, u.nama as unit_nama, p.nama as probis_nama, usr.nama as owner_nama
+      FROM ik_documents d LEFT JOIN units u ON u.id=d.unit_id
+      LEFT JOIN probis p ON p.id=d.probis_id LEFT JOIN users usr ON usr.id=d.owner_id
+      ${where} ORDER BY d.updated_at DESC
     `).all(...params);
-
-    return success(res, items);
-  } catch (err) {
-    return error(res, err.message);
-  }
+    h.success(res, items);
+  } catch (err) { h.error(res, err.message); }
 });
 
-// POST /submit — Submit for review (Draft → Review)
-router.post('/submit', requireAuth, (req, res) => {
+// Helper: create approval record
+function addApproval(db, dokumenId, userId, tahap, catatan) {
+  db.prepare("INSERT INTO ik_approvals (dokumen_id, user_id, tahap, catatan) VALUES (?,?,?,?)")
+    .run(dokumenId, userId, tahap, catatan || null);
+}
+
+// POST /submit — Draft → Review
+router.post('/submit', h.requireAuth, (req, res) => {
   try {
     const db = getDB();
-    const userId = req.user.id;
+    const userId = req.session.user_id;
     const { dokumen_id, catatan } = req.body;
+    if (!dokumen_id) return h.error(res, 'dokumen_id wajib');
 
-    if (!dokumen_id) {
-      return error(res, 'dokumen_id is required');
-    }
+    const doc = db.prepare('SELECT * FROM ik_documents WHERE id=?').get(dokumen_id);
+    if (!doc) return h.notFound(res);
+    if (doc.status !== 'Draft') return h.error(res, 'Dokumen harus berstatus Draft');
 
-    const doc = db.prepare('SELECT * FROM ik_documents WHERE id = ?').get(dokumen_id);
-    if (!doc) {
-      return notFound(res, 'Document not found');
-    }
-
-    if (doc.status !== 'Draft') {
-      return forbidden(res, 'Document must be in Draft status to submit for review');
-    }
-
-    const now = new Date().toISOString();
-
-    db.prepare(`
-      UPDATE ik_documents SET status = 'Review', updated_at = ? WHERE id = ?
-    `).run(now, dokumen_id);
-
-    db.prepare(`
-      INSERT INTO ik_approvals (dokumen_id, user_id, action, status_from, status_to, catatan, created_at)
-      VALUES (?, ?, 'SUBMIT', 'Draft', 'Review', ?, ?)
-    `).run(dokumen_id, userId, catatan || null, now);
-
-    logAudit(db, {
-      user_id: userId,
-      action: 'SUBMIT_DOCUMENT',
-      target_type: 'ik_documents',
-      target_id: dokumen_id,
-      detail: `Submitted document for review: ${doc.judul}`
-    });
-
-    notify(db, {
-      type: 'WORKFLOW',
-      title: 'Document Submitted for Review',
-      message: `Document "${doc.judul}" has been submitted for review.`,
-      target_roles: ['Asman'],
-      target_unit_id: doc.unit_id,
-      reference_type: 'ik_documents',
-      reference_id: dokumen_id
-    });
-
-    return success(res, { message: 'Document submitted for review', status: 'Review' });
-  } catch (err) {
-    return error(res, err.message);
-  }
+    db.prepare("UPDATE ik_documents SET status='Review', submitted_by=?, updated_at=datetime('now','localtime') WHERE id=?").run(userId, dokumen_id);
+    addApproval(db, dokumen_id, userId, 'Submit', catatan);
+    h.logAudit(req, 'SUBMIT_DOCUMENT', `Dokumen ${doc.nomor_dokumen} diajukan review`, 'workflow');
+    h.notify(null, 'Dokumen Diajukan Review', `${doc.judul} menunggu review`);
+    h.success(res, { status: 'Review' }, 'Dokumen berhasil diajukan');
+  } catch (err) { h.error(res, err.message); }
 });
 
-// POST /review — Asman reviews (Review → Approved-T1)
-router.post('/review', requireAuth, (req, res) => {
+// POST /review — Review → Approved-T1 (Asman)
+router.post('/review', h.requireAuth, (req, res) => {
   try {
     const db = getDB();
-    const userId = req.user.id;
+    const userId = req.session.user_id;
     const { dokumen_id, catatan } = req.body;
+    if (!dokumen_id) return h.error(res, 'dokumen_id wajib');
 
-    if (!dokumen_id) {
-      return error(res, 'dokumen_id is required');
-    }
+    const doc = db.prepare('SELECT * FROM ik_documents WHERE id=?').get(dokumen_id);
+    if (!doc) return h.notFound(res);
+    if (doc.status !== 'Review') return h.error(res, 'Dokumen harus berstatus Review');
 
-    const doc = db.prepare('SELECT * FROM ik_documents WHERE id = ?').get(dokumen_id);
-    if (!doc) {
-      return notFound(res, 'Document not found');
-    }
-
-    if (doc.status !== 'Review') {
-      return forbidden(res, 'Document must be in Review status');
-    }
-
-    // Self-review prevention (unless Super Admin)
-    const userRoles = req.user.roles || [];
-    if (doc.owner_id === userId && !userRoles.includes('Super Admin')) {
-      return forbidden(res, 'You cannot review your own document');
-    }
-
-    const now = new Date().toISOString();
-
-    db.prepare(`
-      UPDATE ik_documents SET status = 'Approved-T1', updated_at = ? WHERE id = ?
-    `).run(now, dokumen_id);
-
-    db.prepare(`
-      INSERT INTO ik_approvals (dokumen_id, user_id, action, status_from, status_to, catatan, created_at)
-      VALUES (?, ?, 'REVIEW', 'Review', 'Approved-T1', ?, ?)
-    `).run(dokumen_id, userId, catatan || null, now);
-
-    logAudit(db, {
-      user_id: userId,
-      action: 'REVIEW_DOCUMENT',
-      target_type: 'ik_documents',
-      target_id: dokumen_id,
-      detail: `Reviewed and approved (T1): ${doc.judul}`
-    });
-
-    notify(db, {
-      type: 'WORKFLOW',
-      title: 'Document Reviewed - Awaiting Manager Approval',
-      message: `Document "${doc.judul}" has been reviewed and is awaiting Manager approval.`,
-      target_roles: ['Manager'],
-      target_unit_id: doc.unit_id,
-      reference_type: 'ik_documents',
-      reference_id: dokumen_id
-    });
-
-    return success(res, { message: 'Document reviewed and approved (Tier 1)', status: 'Approved-T1' });
-  } catch (err) {
-    return error(res, err.message);
-  }
+    db.prepare("UPDATE ik_documents SET status='Approved-T1', reviewer_id=?, updated_at=datetime('now','localtime') WHERE id=?").run(userId, dokumen_id);
+    addApproval(db, dokumen_id, userId, 'Review-Asman', catatan);
+    h.logAudit(req, 'REVIEW_DOCUMENT', `Dokumen ${doc.nomor_dokumen} direview Asman`, 'workflow');
+    h.notify(doc.owner_id, 'Dokumen Direview', `${doc.judul} telah direview, menunggu approval Manager`);
+    h.success(res, { status: 'Approved-T1' }, 'Dokumen berhasil direview');
+  } catch (err) { h.error(res, err.message); }
 });
 
-// POST /approve-t1 — Manager approves (Approved-T1 → Approved-T2)
-router.post('/approve-t1', requireAuth, (req, res) => {
+// POST /approve-t1 — Approved-T1 → Approved-T2 (Manager)
+router.post('/approve-t1', h.requireAuth, (req, res) => {
   try {
     const db = getDB();
-    const userId = req.user.id;
+    const userId = req.session.user_id;
     const { dokumen_id, catatan } = req.body;
+    if (!dokumen_id) return h.error(res, 'dokumen_id wajib');
 
-    if (!dokumen_id) {
-      return error(res, 'dokumen_id is required');
-    }
+    const doc = db.prepare('SELECT * FROM ik_documents WHERE id=?').get(dokumen_id);
+    if (!doc) return h.notFound(res);
+    if (doc.status !== 'Approved-T1') return h.error(res, 'Dokumen harus berstatus Approved-T1');
 
-    const doc = db.prepare('SELECT * FROM ik_documents WHERE id = ?').get(dokumen_id);
-    if (!doc) {
-      return notFound(res, 'Document not found');
-    }
-
-    if (doc.status !== 'Approved-T1') {
-      return forbidden(res, 'Document must be in Approved-T1 status');
-    }
-
-    const now = new Date().toISOString();
-
-    db.prepare(`
-      UPDATE ik_documents SET status = 'Approved-T2', updated_at = ? WHERE id = ?
-    `).run(now, dokumen_id);
-
-    db.prepare(`
-      INSERT INTO ik_approvals (dokumen_id, user_id, action, status_from, status_to, catatan, created_at)
-      VALUES (?, ?, 'APPROVE_T1', 'Approved-T1', 'Approved-T2', ?, ?)
-    `).run(dokumen_id, userId, catatan || null, now);
-
-    logAudit(db, {
-      user_id: userId,
-      action: 'APPROVE_T1_DOCUMENT',
-      target_type: 'ik_documents',
-      target_id: dokumen_id,
-      detail: `Manager approved (T1): ${doc.judul}`
-    });
-
-    notify(db, {
-      type: 'WORKFLOW',
-      title: 'Document Approved (T1) - Awaiting SM Approval',
-      message: `Document "${doc.judul}" has been approved by Manager and is awaiting SM approval.`,
-      target_roles: ['SM'],
-      target_unit_id: doc.unit_id,
-      reference_type: 'ik_documents',
-      reference_id: dokumen_id
-    });
-
-    return success(res, { message: 'Document approved (Tier 1)', status: 'Approved-T2' });
-  } catch (err) {
-    return error(res, err.message);
-  }
+    db.prepare("UPDATE ik_documents SET status='Approved-T2', approver_id=?, updated_at=datetime('now','localtime') WHERE id=?").run(userId, dokumen_id);
+    addApproval(db, dokumen_id, userId, 'Approve-Manager', catatan);
+    h.logAudit(req, 'APPROVE_T1', `Dokumen ${doc.nomor_dokumen} diapprove Manager`, 'workflow');
+    h.notify(doc.owner_id, 'Dokumen Diapprove Manager', `${doc.judul} menunggu approval SM`);
+    h.success(res, { status: 'Approved-T2' }, 'Dokumen berhasil diapprove');
+  } catch (err) { h.error(res, err.message); }
 });
 
-// POST /approve-t2 — SM approves (Approved-T2 → Published)
-router.post('/approve-t2', requireAuth, (req, res) => {
+// POST /approve-t2 — Approved-T2 → Published (SM)
+router.post('/approve-t2', h.requireAuth, (req, res) => {
   try {
     const db = getDB();
-    const userId = req.user.id;
+    const userId = req.session.user_id;
     const { dokumen_id, catatan } = req.body;
+    if (!dokumen_id) return h.error(res, 'dokumen_id wajib');
 
-    if (!dokumen_id) {
-      return error(res, 'dokumen_id is required');
-    }
+    const doc = db.prepare('SELECT * FROM ik_documents WHERE id=?').get(dokumen_id);
+    if (!doc) return h.notFound(res);
+    if (doc.status !== 'Approved-T2') return h.error(res, 'Dokumen harus berstatus Approved-T2');
 
-    const doc = db.prepare('SELECT * FROM ik_documents WHERE id = ?').get(dokumen_id);
-    if (!doc) {
-      return notFound(res, 'Document not found');
-    }
-
-    if (doc.status !== 'Approved-T2') {
-      return forbidden(res, 'Document must be in Approved-T2 status');
-    }
-
-    const now = new Date().toISOString();
-
-    db.prepare(`
-      UPDATE ik_documents SET status = 'Published', tanggal_terbit = ?, updated_at = ? WHERE id = ?
-    `).run(now, now, dokumen_id);
-
-    db.prepare(`
-      INSERT INTO ik_approvals (dokumen_id, user_id, action, status_from, status_to, catatan, created_at)
-      VALUES (?, ?, 'APPROVE_T2', 'Approved-T2', 'Published', ?, ?)
-    `).run(dokumen_id, userId, catatan || null, now);
-
-    logAudit(db, {
-      user_id: userId,
-      action: 'APPROVE_T2_DOCUMENT',
-      target_type: 'ik_documents',
-      target_id: dokumen_id,
-      detail: `SM approved and published: ${doc.judul}`
-    });
-
-    notify(db, {
-      type: 'WORKFLOW',
-      title: 'Document Published',
-      message: `Document "${doc.judul}" has been fully approved and published.`,
-      target_user_id: doc.owner_id,
-      reference_type: 'ik_documents',
-      reference_id: dokumen_id
-    });
-
-    return success(res, { message: 'Document approved and published', status: 'Published' });
-  } catch (err) {
-    return error(res, err.message);
-  }
+    db.prepare("UPDATE ik_documents SET status='Published', tanggal_terbit=datetime('now','localtime'), updated_at=datetime('now','localtime') WHERE id=?").run(dokumen_id);
+    addApproval(db, dokumen_id, userId, 'Approve-SM', catatan);
+    h.logAudit(req, 'APPROVE_T2', `Dokumen ${doc.nomor_dokumen} diapprove SM & diterbitkan`, 'workflow');
+    h.notify(doc.owner_id, 'Dokumen Diterbitkan', `${doc.judul} telah diterbitkan`);
+    h.success(res, { status: 'Published' }, 'Dokumen berhasil diterbitkan');
+  } catch (err) { h.error(res, err.message); }
 });
 
-// POST /reject — Reject back to Draft from any review stage
-router.post('/reject', requireAuth, (req, res) => {
+// POST /reject — Reject back to Draft
+router.post('/reject', h.requireAuth, (req, res) => {
   try {
     const db = getDB();
-    const userId = req.user.id;
+    const userId = req.session.user_id;
     const { dokumen_id, catatan } = req.body;
+    if (!dokumen_id) return h.error(res, 'dokumen_id wajib');
+    if (!catatan) return h.error(res, 'Alasan penolakan wajib diisi');
 
-    if (!dokumen_id) {
-      return error(res, 'dokumen_id is required');
-    }
+    const doc = db.prepare('SELECT * FROM ik_documents WHERE id=?').get(dokumen_id);
+    if (!doc) return h.notFound(res);
+    if (!['Review', 'Approved-T1', 'Approved-T2'].includes(doc.status)) return h.error(res, 'Dokumen tidak dalam tahap review');
 
-    if (!catatan) {
-      return error(res, 'catatan (reason) is required for rejection');
-    }
-
-    const doc = db.prepare('SELECT * FROM ik_documents WHERE id = ?').get(dokumen_id);
-    if (!doc) {
-      return notFound(res, 'Document not found');
-    }
-
-    const allowedStatuses = ['Review', 'Approved-T1', 'Approved-T2'];
-    if (!allowedStatuses.includes(doc.status)) {
-      return forbidden(res, 'Document must be in a review stage to be rejected');
-    }
-
-    const now = new Date().toISOString();
-    const previousStatus = doc.status;
-
-    db.prepare(`
-      UPDATE ik_documents SET status = 'Draft', updated_at = ? WHERE id = ?
-    `).run(now, dokumen_id);
-
-    db.prepare(`
-      INSERT INTO ik_approvals (dokumen_id, user_id, action, status_from, status_to, catatan, created_at)
-      VALUES (?, ?, 'REJECT', ?, 'Draft', ?, ?)
-    `).run(dokumen_id, userId, previousStatus, catatan, now);
-
-    logAudit(db, {
-      user_id: userId,
-      action: 'REJECT_DOCUMENT',
-      target_type: 'ik_documents',
-      target_id: dokumen_id,
-      detail: `Rejected document from ${previousStatus} to Draft: ${doc.judul}. Reason: ${catatan}`
-    });
-
-    notify(db, {
-      type: 'WORKFLOW',
-      title: 'Document Rejected',
-      message: `Document "${doc.judul}" has been rejected. Reason: ${catatan}`,
-      target_user_id: doc.owner_id,
-      reference_type: 'ik_documents',
-      reference_id: dokumen_id
-    });
-
-    return success(res, { message: 'Document rejected', status: 'Draft', previous_status: previousStatus });
-  } catch (err) {
-    return error(res, err.message);
-  }
+    db.prepare("UPDATE ik_documents SET status='Rejected', updated_at=datetime('now','localtime') WHERE id=?").run(dokumen_id);
+    addApproval(db, dokumen_id, userId, 'Reject', catatan);
+    h.logAudit(req, 'REJECT_DOCUMENT', `Dokumen ${doc.nomor_dokumen} ditolak: ${catatan}`, 'workflow');
+    h.notify(doc.owner_id, 'Dokumen Ditolak', `${doc.judul} ditolak: ${catatan}`);
+    h.success(res, { status: 'Rejected' }, 'Dokumen ditolak');
+  } catch (err) { h.error(res, err.message); }
 });
 
 // POST /return-revisi — Return to Draft for revision
-router.post('/return-revisi', requireAuth, (req, res) => {
+router.post('/return-revisi', h.requireAuth, (req, res) => {
   try {
     const db = getDB();
-    const userId = req.user.id;
+    const userId = req.session.user_id;
     const { dokumen_id, catatan } = req.body;
+    if (!dokumen_id) return h.error(res, 'dokumen_id wajib');
 
-    if (!dokumen_id) {
-      return error(res, 'dokumen_id is required');
-    }
+    const doc = db.prepare('SELECT * FROM ik_documents WHERE id=?').get(dokumen_id);
+    if (!doc) return h.notFound(res);
+    if (!['Review', 'Approved-T1', 'Approved-T2'].includes(doc.status)) return h.error(res, 'Dokumen tidak dalam tahap review');
 
-    const doc = db.prepare('SELECT * FROM ik_documents WHERE id = ?').get(dokumen_id);
-    if (!doc) {
-      return notFound(res, 'Document not found');
-    }
-
-    const allowedStatuses = ['Review', 'Approved-T1', 'Approved-T2'];
-    if (!allowedStatuses.includes(doc.status)) {
-      return forbidden(res, 'Document must be in a review stage to be returned for revision');
-    }
-
-    const now = new Date().toISOString();
-    const previousStatus = doc.status;
-
-    db.prepare(`
-      UPDATE ik_documents SET status = 'Draft', updated_at = ? WHERE id = ?
-    `).run(now, dokumen_id);
-
-    db.prepare(`
-      INSERT INTO ik_approvals (dokumen_id, user_id, action, status_from, status_to, catatan, created_at)
-      VALUES (?, ?, 'RETURN_REVISI', ?, 'Draft', ?, ?)
-    `).run(dokumen_id, userId, previousStatus, catatan || null, now);
-
-    logAudit(db, {
-      user_id: userId,
-      action: 'RETURN_REVISI_DOCUMENT',
-      target_type: 'ik_documents',
-      target_id: dokumen_id,
-      detail: `Returned document for revision from ${previousStatus}: ${doc.judul}`
-    });
-
-    notify(db, {
-      type: 'WORKFLOW',
-      title: 'Document Returned for Revision',
-      message: `Document "${doc.judul}" has been returned for revision.${catatan ? ' Note: ' + catatan : ''}`,
-      target_user_id: doc.owner_id,
-      reference_type: 'ik_documents',
-      reference_id: dokumen_id
-    });
-
-    return success(res, { message: 'Document returned for revision', status: 'Draft', previous_status: previousStatus });
-  } catch (err) {
-    return error(res, err.message);
-  }
+    db.prepare("UPDATE ik_documents SET status='Draft', updated_at=datetime('now','localtime') WHERE id=?").run(dokumen_id);
+    addApproval(db, dokumen_id, userId, 'Return-Revisi', catatan);
+    h.logAudit(req, 'RETURN_REVISI', `Dokumen ${doc.nomor_dokumen} dikembalikan untuk revisi`, 'workflow');
+    h.notify(doc.owner_id, 'Dokumen Perlu Revisi', `${doc.judul} dikembalikan untuk revisi${catatan ? ': ' + catatan : ''}`);
+    h.success(res, { status: 'Draft' }, 'Dokumen dikembalikan untuk revisi');
+  } catch (err) { h.error(res, err.message); }
 });
 
-// POST /archive — Archive a Published document
-router.post('/archive', requireAuth, (req, res) => {
+// POST /archive — Published → Archived
+router.post('/archive', h.requireAuth, (req, res) => {
   try {
     const db = getDB();
-    const userId = req.user.id;
+    const userId = req.session.user_id;
     const { dokumen_id, catatan } = req.body;
+    if (!dokumen_id) return h.error(res, 'dokumen_id wajib');
 
-    if (!dokumen_id) {
-      return error(res, 'dokumen_id is required');
-    }
+    const doc = db.prepare('SELECT * FROM ik_documents WHERE id=?').get(dokumen_id);
+    if (!doc) return h.notFound(res);
+    if (doc.status !== 'Published') return h.error(res, 'Hanya dokumen Published yang bisa diarsipkan');
 
-    const doc = db.prepare('SELECT * FROM ik_documents WHERE id = ?').get(dokumen_id);
-    if (!doc) {
-      return notFound(res, 'Document not found');
-    }
-
-    if (doc.status !== 'Published') {
-      return forbidden(res, 'Only Published documents can be archived');
-    }
-
-    const now = new Date().toISOString();
-
-    db.prepare(`
-      UPDATE ik_documents SET status = 'Archived', updated_at = ? WHERE id = ?
-    `).run(now, dokumen_id);
-
-    db.prepare(`
-      INSERT INTO ik_approvals (dokumen_id, user_id, action, status_from, status_to, catatan, created_at)
-      VALUES (?, ?, 'ARCHIVE', 'Published', 'Archived', ?, ?)
-    `).run(dokumen_id, userId, catatan || null, now);
-
-    logAudit(db, {
-      user_id: userId,
-      action: 'ARCHIVE_DOCUMENT',
-      target_type: 'ik_documents',
-      target_id: dokumen_id,
-      detail: `Archived document: ${doc.judul}`
-    });
-
-    notify(db, {
-      type: 'WORKFLOW',
-      title: 'Document Archived',
-      message: `Document "${doc.judul}" has been archived.`,
-      target_user_id: doc.owner_id,
-      reference_type: 'ik_documents',
-      reference_id: dokumen_id
-    });
-
-    return success(res, { message: 'Document archived', status: 'Archived' });
-  } catch (err) {
-    return error(res, err.message);
-  }
+    db.prepare("UPDATE ik_documents SET status='Archived', updated_at=datetime('now','localtime') WHERE id=?").run(dokumen_id);
+    addApproval(db, dokumen_id, userId, 'Archive', catatan);
+    h.logAudit(req, 'ARCHIVE_DOCUMENT', `Dokumen ${doc.nomor_dokumen} diarsipkan`, 'workflow');
+    h.success(res, { status: 'Archived' }, 'Dokumen berhasil diarsipkan');
+  } catch (err) { h.error(res, err.message); }
 });
 
 module.exports = router;

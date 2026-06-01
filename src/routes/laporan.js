@@ -13,9 +13,8 @@ router.get('/', h.requireAuth, (req, res) => {
   const by_status = {};
   for (const r of statusRows) by_status[r.status] = r.c;
 
-  // By risk
-  const riskRows = db.prepare(`SELECT r.tingkat_risiko, COUNT(*) as c FROM ik_risiko r
-    JOIN ik_documents d ON r.dokumen_id=d.id GROUP BY r.tingkat_risiko`).all();
+  // By risk (from ik_documents.tingkat_risiko)
+  const riskRows = db.prepare("SELECT tingkat_risiko, COUNT(*) as c FROM ik_documents WHERE tingkat_risiko IS NOT NULL GROUP BY tingkat_risiko").all();
   const by_risk = {};
   for (const r of riskRows) by_risk[r.tingkat_risiko] = r.c;
 
@@ -25,7 +24,7 @@ router.get('/', h.requireAuth, (req, res) => {
     SUM(CASE WHEN d.status='Published' THEN 1 ELSE 0 END) as published,
     SUM(CASE WHEN d.status='Draft' THEN 1 ELSE 0 END) as draft,
     SUM(CASE WHEN d.status IN ('Review','Approved-T1') THEN 1 ELSE 0 END) as in_review,
-    SUM(CASE WHEN d.status='Published' AND d.tanggal_berlaku IS NOT NULL AND date(d.tanggal_berlaku) < date('now') THEN 1 ELSE 0 END) as overdue
+    SUM(CASE WHEN d.status='Published' AND d.review_due IS NOT NULL AND date(d.review_due) < date('now') THEN 1 ELSE 0 END) as overdue
     FROM units u LEFT JOIN ik_documents d ON u.id=d.unit_id
     GROUP BY u.id ORDER BY u.nama`).all();
 
@@ -56,26 +55,6 @@ router.get('/', h.requireAuth, (req, res) => {
     compliance: { compliance_rate, compliant: compliant > 0 ? compliant : 0, total },
     overdue_count
   });
-});
-
-// Sub-routes for detailed reports
-router.get('/per-unit', h.requireAuth, (req, res) => {
-  const rows = getDB().prepare(`SELECT u.id, u.nama, u.kode,
-    COUNT(d.id) as total,
-    SUM(CASE WHEN d.status='Published' THEN 1 ELSE 0 END) as published,
-    SUM(CASE WHEN d.status='Draft' THEN 1 ELSE 0 END) as draft
-    FROM units u LEFT JOIN ik_documents d ON u.id=d.unit_id
-    GROUP BY u.id ORDER BY u.nama`).all();
-  h.success(res, rows);
-});
-
-router.get('/per-probis', h.requireAuth, (req, res) => {
-  const rows = getDB().prepare(`SELECT p.id, p.nama, p.kode,
-    COUNT(d.id) as total,
-    SUM(CASE WHEN d.status='Published' THEN 1 ELSE 0 END) as published
-    FROM probis p LEFT JOIN ik_documents d ON p.id=d.probis_id
-    GROUP BY p.id ORDER BY p.nama`).all();
-  h.success(res, rows);
 });
 
 module.exports = router;
