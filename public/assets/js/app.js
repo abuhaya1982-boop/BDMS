@@ -315,9 +315,10 @@ function buildPrintableDoc(d, ctx) {
 
   // ── CSS ──
   const css = `
-@page{size:A4;margin:15mm 15mm 20mm 15mm}
+@page{size:A4;margin:10mm}
+@page:first{margin:10mm}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Courier Prime','JetBrains Mono','IBM Plex Mono','Source Code Pro',monospace;font-size:10pt;line-height:1.7;color:#1a1a1a;background:#e2e8f0;font-weight:300;-webkit-font-smoothing:antialiased;letter-spacing:0.005em}
+body{font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;font-size:10pt;line-height:1.5;color:#1a1a1a;background:#e2e8f0;-webkit-font-smoothing:antialiased}
 .toolbar{position:fixed;top:0;left:0;right:0;background:#1a1f2e;color:#fff;padding:6px 16px;display:flex;align-items:center;gap:10px;z-index:9999;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
 .toolbar button{background:#2563EB;color:#fff;border:none;padding:5px 12px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600}
 .toolbar button:hover{background:#1d4ed8}
@@ -328,18 +329,19 @@ body{font-family:'Courier Prime','JetBrains Mono','IBM Plex Mono','Source Code P
 
 /* Pages — consistent on screen & print */
 .page-container{max-width:210mm;margin:50px auto 30px}
-.page{padding:20mm;position:relative;min-height:297mm;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.12);margin-bottom:40px}
+.page{padding:10mm;position:relative;min-height:297mm;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.12);margin-bottom:40px}
 .page-break{page-break-before:always}
 .page-top{padding-top:15mm}
+.page-number{position:absolute;bottom:10mm;right:15mm;font-size:8pt;color:#666}
 
 /* ── HALAMAN JUDUL (Cover) ── */
-.cover{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:297mm;padding:30mm 25mm;text-align:center;page-break-after:always}
-.cover-label{font-size:16pt;font-weight:700;color:#000;letter-spacing:2px;margin-bottom:4px}
-.cover-company{font-size:14pt;font-weight:700;color:#0066B3;margin-bottom:40px}
-.cover-logo{margin-bottom:30px}
-.cover-logo img{height:60px}
-.cover-title-box{border:2px solid #000;padding:20px 40px;margin-bottom:40px;min-width:80%}
-.cover-title{font-size:16pt;font-weight:700;line-height:1.3}
+.cover{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:297mm;padding:10mm;text-align:center;page-break-after:always}
+.cover-label{font-size:18pt;font-weight:700;color:#000;letter-spacing:1.5px;margin-bottom:4px}
+.cover-company{font-size:16pt;font-weight:700;color:#2A7489;margin-bottom:30px}
+.cover-logo{margin-bottom:20px}
+.cover-logo img{height:70px}
+.cover-title-box{border:2px solid #2A7489;padding:20px 40px;margin-bottom:40px;min-width:80%}
+.cover-title{font-size:16pt;font-weight:700;line-height:1.3;color:#2A7489}
 .cover-meta{width:70%;margin:0 auto 40px;text-align:left}
 .cover-meta table{width:100%;font-size:11pt;border-collapse:collapse}
 .cover-meta td{padding:6px 4px;vertical-align:top}
@@ -365,19 +367,19 @@ body{font-family:'Courier Prime','JetBrains Mono','IBM Plex Mono','Source Code P
 .ik-header .value-cell{font-family:inherit;font-size:9pt;min-width:140px}
 
 /* ── CONTENT TABLES ── */
-table.tbl{width:100%;border-collapse:collapse;margin:6px 0 12px;font-size:9.5pt;font-family:inherit}
+table.tbl{width:100%;border-collapse:collapse;margin:6px 0 12px;font-size:9.5pt}
 table.tbl th,table.tbl td{border:1px solid #000;padding:4px 8px;vertical-align:top}
 table.tbl th{background:#D9E2F3;font-weight:700;text-align:center;font-size:9pt}
 table.tbl td.no{text-align:center;width:30px}
 
 /* Sections */
-.sec-title{font-size:11pt;font-weight:700;margin:16px 0 6px;padding:4px 0;border-bottom:1.5px solid #000;font-family:inherit}
+.sec-title{font-size:11pt;font-weight:700;margin:16px 0 6px;padding:4px 0;border-bottom:1.5px solid #000}
 .sec-num{margin-right:8px}
-.sub-title{font-weight:700;font-size:10pt;margin:10px 0 4px;font-family:inherit}
-p.content{margin:4px 0 10px;text-align:justify;font-size:10pt;font-family:inherit}
-ul.content-list{margin:4px 0 10px 20px;font-size:10pt;font-family:inherit}
+.sub-title{font-weight:700;font-size:10pt;margin:10px 0 4px}
+p.content{margin:4px 0 10px;text-align:justify;font-size:10pt}
+ul.content-list{margin:4px 0 10px 20px;font-size:10pt}
 ul.content-list li{margin-bottom:2px}
-ol.step-list{margin:4px 0 10px 20px;font-size:10pt;counter-reset:stp;font-family:inherit}
+ol.step-list{margin:4px 0 10px 20px;font-size:10pt;counter-reset:stp}
 ol.step-list li{margin-bottom:4px;padding-left:4px}
 
 /* Step tables */
@@ -385,7 +387,7 @@ table.step-tbl td{white-space:pre-wrap;word-wrap:break-word}
 table.step-tbl ul,table.step-tbl ol{margin:2px 0 2px 16px;padding:0}
 table.step-tbl li{margin-bottom:1px}
 .step-meta{color:#555;font-size:8.5pt}
-.sec-content{margin:4px 0 12px;font-size:10pt;overflow-wrap:break-word;word-wrap:break-word;word-break:break-word;max-width:100%;overflow:hidden}
+.sec-content{margin:4px 0 12px;font-size:10pt;overflow-wrap:break-word;word-wrap:break-word;word-break:break-word;max-width:100%;overflow:hidden;text-align:justify}
 .sec-content p,.sec-content div,.sec-content span,.sec-content li{max-width:100%!important;margin-left:0!important;margin-right:0!important;text-indent:0!important}
 .sec-content ul,.sec-content ol{max-width:100%!important;margin-left:20px!important;margin-right:0!important;padding-left:0!important}
 .sec-content table{max-width:100%!important;width:100%!important;table-layout:fixed}
@@ -411,10 +413,11 @@ table.step-tbl li{margin-bottom:1px}
   .no-print{display:none!important}
   body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .page-container{margin:0;max-width:none}
-  .page{box-shadow:none;margin:0;padding:20mm;min-height:auto}
+  .page{box-shadow:none;margin:0;padding:0;min-height:auto}
   .page-break{page-break-before:always}
-  .cover{min-height:auto;height:auto;padding:30mm 25mm;page-break-after:always}
-  .page-top{padding-top:15mm}
+  .cover{min-height:auto;height:100vh;padding:10mm;page-break-after:always}
+  .page-top{padding-top:0}
+  .page-number{display:none}
   .content-wrap-table thead{display:table-header-group}
   .content-page{padding:15mm 20mm;min-height:auto}
   /* Prevent section titles from being orphaned at bottom of page */
@@ -441,9 +444,10 @@ table.step-tbl li{margin-bottom:1px}
 }
 `;
 
-  // ── COVER PAGE (no logo, uppercase title, 3 signature columns) ──
+  // ── COVER PAGE ──
   const coverHtml = `
 <div class="page cover">
+  ${logoB64 ? `<div class="cover-logo"><img src="${logoB64}" alt="PLN NP"></div>` : ''}
   <div class="cover-label">INSTRUKSI KERJA (IK)</div>
   <div class="cover-company">PT PLN NUSANTARA POWER</div>
   <div class="cover-title-box">
@@ -854,7 +858,7 @@ table.step-tbl li{margin-bottom:1px}
   // ── ASSEMBLE FULL DOCUMENT ──
   return `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">
 <title>${nom} &mdash; ${judul}</title>
-<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<!-- Arial is a system font, no external CSS needed -->
 <style>${css}</style>
 </head><body>
 <div class="toolbar no-print">
@@ -945,7 +949,7 @@ function downloadAsDoc(){
     '<!--[if gte mso 9]><xml><w:LatentStyles DefLockedState="false" DefUnhideWhenUsed="false" DefSemiHidden="false" DefQFormat="false" DefPriority="99"/><\\/xml><![endif]-->';
 
   var docCss =
-    '@page WordSection1{size:210mm 297mm;margin:20mm 20mm 20mm 20mm;mso-header-margin:10mm;mso-footer-margin:15mm}' +
+    '@page WordSection1{size:210mm 297mm;margin:10mm 10mm 10mm 10mm;mso-header-margin:5mm;mso-footer-margin:5mm}' +
     'div.WordSection1{page:WordSection1}' +
     'body{font-family:"Courier New",Courier,monospace;font-size:10pt;line-height:1.6;color:#1a1a1a;background:#fff;margin:0;padding:0}' +
     'table{border-collapse:collapse;mso-table-lspace:0;mso-table-rspace:0}' +

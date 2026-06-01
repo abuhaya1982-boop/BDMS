@@ -37,9 +37,12 @@ app.use(session({
 // Serve static frontend files (no cache for HTML, short cache for assets)
 app.use(express.static(path.join(__dirname, 'public'), {
   etag: false,
+  lastModified: true,
+  maxAge: 0,
   setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.html')) {
+    if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
     }
   }
 }));

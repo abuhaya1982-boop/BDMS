@@ -13,8 +13,8 @@ const {
 
 // ═══ CONSTANTS ═══
 const A4_W = 11906, A4_H = 16838;
-const MARGIN = { top: 1134, right: 1134, bottom: 1134, left: 1134 }; // ~2cm all sides
-const CONTENT_W = A4_W - MARGIN.left - MARGIN.right; // 9638 DXA
+const MARGIN = { top: 567, right: 567, bottom: 567, left: 567 }; // ~10mm all sides
+const CONTENT_W = A4_W - MARGIN.left - MARGIN.right; // 10772 DXA
 const FONT = 'Arial';
 const SZ = { xs: 14, sm: 16, md: 20, lg: 22, xl: 28, xxl: 36, title: 44, cover: 56 }; // half-points
 const CLR = { primary: '2A7489', dark: '000000', gray: '808080', headerBg: 'D9E2F3', white: 'FFFFFF' };
