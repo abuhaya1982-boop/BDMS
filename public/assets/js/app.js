@@ -393,6 +393,15 @@ table.step-tbl li{margin-bottom:1px}
 .sec-content p.content{margin:4px 0}
 .sec-content ul.content-list{margin:4px 0 8px 20px}
 
+/* Screen/Print visibility */
+.print-only{display:none}
+.screen-only{display:block}
+
+/* Screen page structure */
+.page-hdr{margin-bottom:8px}
+.page-body{flex:1;overflow:hidden}
+.page-ftr{margin-top:auto;padding-top:6px}
+
 /* Content page wrapper — repeating header & footer on print */
 .content-wrap-table{width:100%;border-collapse:collapse;border:none}
 .content-wrap-table,.content-wrap-table thead,.content-wrap-table tbody,.content-wrap-table tfoot,.content-wrap-table tr,.content-thead-cell,.content-tbody-cell,.content-tfoot-cell{border:none;padding:0;margin:0}
@@ -410,6 +419,8 @@ table.step-tbl li{margin-bottom:1px}
 /* ═══ PRINT — make screen & print identical, NO section leaks ═══ */
 @media print{
   .no-print{display:none!important}
+  .print-only{display:block!important}
+  .screen-only{display:none!important}
   body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .page-container{margin:0;max-width:none}
   .page{box-shadow:none;margin:0;padding:0;min-height:auto}
@@ -492,7 +503,7 @@ table.step-tbl li{margin-bottom:1px}
   // ── HEADER TABLE (used on page 2+) ──
   const hdrTable = `<table class="ik-header">
   <tr>
-    <td class="logo-cell" rowspan="3">PLN NP</td>
+    <td class="logo-cell" rowspan="3">${logoB64 ? `<img src="${logoB64}">` : 'PLN NP'}</td>
     <td class="company-cell" rowspan="2" style="width:35%">PT PLN NUSANTARA POWER<br><span style="font-size:8pt;font-weight:400">INTEGRATED MANAGEMENT SYSTEM</span></td>
     <td class="label-cell">No. Dokumen</td>
     <td class="value-cell" style="word-break:break-all">: ${nom}</td>
@@ -845,15 +856,29 @@ table.step-tbl li{margin-bottom:1px}
   <span>${nom} Rev.${rev} &mdash; Dicetak ${new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}</span>
 </div>`;
 
-  // ── PAGE 3+: Use <table><thead>/<tfoot> trick so IMS header & footer repeat on every printed page ──
+  // ── PAGE 3+: Content pages with IMS header repeated ──
+  // Screen: shows as multiple A4 "page cards" via JS pagination after load
+  // Print: uses <table><thead>/<tfoot> trick for browser-native repeat
   const runFooter = `<div style="text-align:center;font-size:8pt;color:#666;padding-top:4px;border-top:0.5px solid #ccc">${nom} &mdash; Rev.${rev} &mdash; PT PLN Nusantara Power UP Brantas</div>`;
-  const page3 = `
-<div class="page page-break page-top content-page">
+
+  // Print version (hidden on screen, shown on print) — uses table trick
+  const printPage3 = `
+<div class="print-only page-break content-page">
   <table class="content-wrap-table">
     <thead><tr><td class="content-thead-cell">${hdrTable}</td></tr></thead>
     <tfoot><tr><td class="content-tfoot-cell">${runFooter}</td></tr></tfoot>
     <tbody><tr><td class="content-tbody-cell">${body}</td></tr></tbody>
   </table>
+</div>`;
+
+  // Screen version (shown on screen, hidden on print) — paginated by JS
+  const screenPage3 = `
+<div class="screen-only" id="screen-content-pages">
+  <div class="page page-break page-top content-page">
+    <div class="page-hdr">${hdrTable}</div>
+    <div class="page-body" id="content-body-source">${body}</div>
+    <div class="page-ftr">${runFooter}</div>
+  </div>
 </div>`;
 
   // ── ASSEMBLE FULL DOCUMENT ──
@@ -873,11 +898,18 @@ table.step-tbl li{margin-bottom:1px}
 <div class="page-container">
   ${coverHtml}
   ${page2}
-  ${page3}
+  ${printPage3}
+  ${screenPage3}
 </div>
 <script>
 function downloadAsDoc(){
-  var c=document.querySelector('.page-container').innerHTML;
+  // ── Clone page-container, remove screen-only, show print-only ──
+  var tmp = document.querySelector('.page-container').cloneNode(true);
+  var screenEls = tmp.querySelectorAll('.screen-only');
+  for(var s=0;s<screenEls.length;s++) screenEls[s].parentNode.removeChild(screenEls[s]);
+  var printEls = tmp.querySelectorAll('.print-only');
+  for(var p=0;p<printEls.length;p++) printEls[p].style.display='block';
+  var c = tmp.innerHTML;
 
   // ── Clean up HTML for Word compatibility ──
   // Remove SVG (QR code) — convert to descriptive text box for Word
@@ -1023,6 +1055,83 @@ function downloadAsDoc(){
   var b=new Blob(['\\ufeff'+h],{type:'application/msword;charset=utf-8'});
   var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='${nom}.doc';a.click();URL.revokeObjectURL(a.href);
 }
+<\/script>
+<script>
+// ── Screen Pagination: break content into visual A4 page cards ──
+document.addEventListener('DOMContentLoaded', function(){
+  var src = document.getElementById('content-body-source');
+  var wrap = document.getElementById('screen-content-pages');
+  if(!src || !wrap) return;
+
+  // A4 body height in px: 297mm - 15mm top - 15mm bottom = 267mm for full page
+  // But we also have header (~40px) + footer (~30px), so usable body ≈ 267mm - header - footer
+  // Convert mm to px at 96dpi: 1mm ≈ 3.7795px
+  var MM = 3.7795;
+  var PAGE_H = 267 * MM;        // 267mm in px (≈1009px)
+  var HDR_H  = 65;               // approximate header table height in px
+  var FTR_H  = 30;               // approximate footer height in px
+  var BODY_H = PAGE_H - HDR_H - FTR_H - 24; // usable body per page (~890px)
+
+  // Get header and footer HTML from the first page
+  var firstPage = wrap.querySelector('.content-page');
+  if(!firstPage) return;
+  var hdrHtml = firstPage.querySelector('.page-hdr') ? firstPage.querySelector('.page-hdr').outerHTML : '';
+  var ftrHtml = firstPage.querySelector('.page-ftr') ? firstPage.querySelector('.page-ftr').outerHTML : '';
+
+  // Collect all direct children of the source body
+  var children = Array.prototype.slice.call(src.children);
+  if(!children.length) return;
+
+  // Create pages
+  var pages = [];
+  var currentBody = document.createElement('div');
+  currentBody.className = 'page-body';
+  var currentH = 0;
+
+  function newPage(){
+    var pg = document.createElement('div');
+    pg.className = 'page page-break page-top content-page';
+    pg.innerHTML = hdrHtml;
+    pg.appendChild(currentBody);
+    var ftr = document.createElement('div');
+    ftr.innerHTML = ftrHtml;
+    pg.appendChild(ftr.firstElementChild || ftr);
+    pages.push(pg);
+    currentBody = document.createElement('div');
+    currentBody.className = 'page-body';
+    currentH = 0;
+  }
+
+  for(var i=0; i<children.length; i++){
+    var el = children[i];
+    var clone = el.cloneNode(true);
+    // Temporarily add to DOM to measure
+    currentBody.appendChild(clone);
+    src.appendChild(currentBody);
+    var elH = clone.offsetHeight || 0;
+    src.removeChild(currentBody);
+
+    if(currentH > 0 && (currentH + elH) > BODY_H){
+      // Remove the clone from current, start new page
+      currentBody.removeChild(clone);
+      newPage();
+      currentBody.appendChild(clone);
+      currentH = elH;
+    } else {
+      currentH += elH;
+    }
+  }
+  // Flush last page
+  if(currentBody.children.length > 0){
+    newPage();
+  }
+
+  // Replace original content
+  wrap.innerHTML = '';
+  for(var p=0; p<pages.length; p++){
+    wrap.appendChild(pages[p]);
+  }
+});
 <\/script></body></html>`;
 }
 
