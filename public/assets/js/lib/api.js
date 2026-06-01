@@ -60,6 +60,7 @@ const API = {
   getDokumen(params = '') { return this.get('dokumen' + (params ? '?' + params : '')); },
   getDokumenById(id) { return this.get('dokumen/' + id); },
   getDokumenPdf(id) { return this.base + 'dokumen/' + id + '/pdf'; },
+  getDokumenDocxUrl(id) { return this.base + 'dokumen/' + id + '/docx'; },
   createDokumen(data) { return this.post('dokumen', data); },
   updateDokumen(id, data) { return this.put('dokumen/' + id, data); },
   deleteDokumen(id) { return this.del('dokumen/' + id); },

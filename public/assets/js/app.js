@@ -107,49 +107,35 @@ async function doForgotPassword() {
 // Sesuai Template IK Tahun 2025
 // ═══════════════════════════════════════════════════════════════
 
-async function downloadPdf(id) { await previewDokumenFull(id, 'pdf'); }
+async function downloadPdf(id) { await downloadDocx(id); }
 
-async function previewDokumenFull(id, mode) {
+async function downloadDocx(id) {
   try {
-    const res = await API.getDokumenById(id);
-    const d = res.data;
-    const unit = d.unit_nama || '';
-    const probis = d.probis_nama || '';
-    const owner = d.owner_nama || '';
-
-    // Get cloud link from settings (admin-configurable)
-    let cloudBaseUrl = '';
-    try {
-      const settRes = await API.getSettings();
-      cloudBaseUrl = settRes.data?.cloud_base_url || '';
-    } catch(e) { /* ignore */ }
-
-    const gdrivePath = cloudBaseUrl
-      ? `${cloudBaseUrl.replace(/\/+$/,'')}/${unit.replace(/\s+/g,'_')}/${d.nomor_dokumen}/`
-      : `G:/IMS_UP_Brantas/Instruksi_Kerja/${unit.replace(/\s+/g,'_')}/${d.nomor_dokumen}/`;
-
-    // QR code data — use cloud link if available, otherwise internal reference
-    const qrData = cloudBaseUrl
-      ? `${gdrivePath}`
-      : `BDMS|${d.nomor_dokumen}|Rev${d.revisi||'00'}|${unit}`;
-    const qrSvg = generateQRCodeSVG(qrData, 150);
-
-    const konten = d.konten || {};
-    const steps = d.steps || konten.steps || {};
-    const logoB64 = typeof LOGO_PLN_NP_B64 !== 'undefined' ? LOGO_PLN_NP_B64 : '';
-    const html = buildPrintableDoc(d, { unit, probis, owner, gdrivePath, qrSvg, steps, konten, logoB64 });
-    const w = window.open('', '_blank');
-    if (!w) { showToast('Pop-up diblokir browser. Izinkan pop-up untuk preview.', 'error'); return; }
-    w.document.write(html);
-    w.document.close();
-    w.focus();
-    if (mode === 'pdf') setTimeout(() => w.print(), 600);
-    showToast(`Preview: ${d.nomor_dokumen}`, 'success');
+    showToast('Mengunduh DOCX...', 'info');
+    const url = API.getDokumenDocxUrl(id);
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      const errJson = await resp.json().catch(() => null);
+      throw new Error(errJson?.message || `HTTP ${resp.status}`);
+    }
+    const blob = await resp.blob();
+    const cd = resp.headers.get('Content-Disposition') || '';
+    const fnMatch = cd.match(/filename="?([^"]+)"?/);
+    const filename = fnMatch ? fnMatch[1] : `IK_${id}.docx`;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast('DOCX berhasil diunduh: ' + filename, 'success');
   } catch (e) {
-    console.error('previewDokumenFull error:', e);
-    showToast('Gagal memuat dokumen: ' + (e.message || JSON.stringify(e)), 'error');
+    console.error('downloadDocx error:', e);
+    showToast('Gagal download DOCX: ' + (e.message || JSON.stringify(e)), 'error');
   }
 }
+
+// Legacy alias — kept for backward compatibility
+async function previewDokumenFull(id, mode) { await downloadDocx(id); }
 
 function escH(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDate(d) { if (!d) return '-'; try { return new Date(d).toLocaleDateString('id-ID',{day:'2-digit',month:'2-digit',year:'numeric'}); } catch { return d; } }
