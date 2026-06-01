@@ -795,18 +795,25 @@ async function renderBuatIK(container) {
   try {
     const tplRes = await API.getActiveTemplate();
     activeTemplate = tplRes.data;
+    console.log('[BuatIK] Active template loaded:', activeTemplate?.nama, activeTemplate?.versi, '| Sections in konten:', activeTemplate?.konten ? JSON.parse(activeTemplate.konten).length : 0);
 
     if (editingDocId && docSnapshot) {
+      // Editing existing doc → use its frozen snapshot
       const parsed = JSON.parse(docSnapshot);
       activeTemplateSections = parsed.filter(s => s.enabled !== false);
-      if (docTemplateVersi && activeTemplate.versi !== docTemplateVersi) {
+      console.log('[BuatIK] Using doc snapshot:', activeTemplateSections.length, 'sections (doc template:', docTemplateVersi, ')');
+      if (docTemplateVersi && activeTemplate && activeTemplate.versi !== docTemplateVersi) {
         canUpgradeTemplate = true;
+        console.log('[BuatIK] Template upgrade available:', docTemplateVersi, '→', activeTemplate.versi);
       }
     } else {
-      const parsed = activeTemplate.konten ? JSON.parse(activeTemplate.konten) : [];
+      // New document → use active template from server
+      const parsed = activeTemplate && activeTemplate.konten ? JSON.parse(activeTemplate.konten) : [];
       activeTemplateSections = parsed.filter(s => s.enabled !== false);
+      console.log('[BuatIK] New doc using active template:', activeTemplateSections.length, 'enabled sections:', activeTemplateSections.map(s => s.id).join(', '));
     }
   } catch (e) {
+    console.error('[BuatIK] Template load error:', e.message);
     if (docSnapshot) {
       try {
         const parsed = JSON.parse(docSnapshot);
@@ -865,10 +872,15 @@ async function renderBuatIK(container) {
         <button class="btn btn-primary btn-sm" onclick="submitIK()">${icon('upload', 14)} Submit</button>
       </div>
     </div>
-    ${activeTemplate ? `<div style="background:#EBF5FF;border:1px solid #B3D4FC;border-radius:6px;padding:6px 12px;margin-bottom:8px;display:flex;align-items:center;gap:8px;font-size:11px;color:#1565C0">
-      ${icon('layout-template', 14)}
-      <span>Form ini menggunakan template <strong>${esc(activeTemplate.nama)}</strong> versi <strong>${esc(activeTemplate.versi)}</strong> — ${activeTemplateSections.length} seksi aktif</span>
-      ${editingDocId && canUpgradeTemplate ? `<span style="color:#E65100;font-weight:600">| Template terbaru tersedia</span>` : ''}
+    ${activeTemplate ? `<div style="background:#EBF5FF;border:1px solid #B3D4FC;border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:11px;color:#1565C0">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        ${icon('layout-template', 14)}
+        <span>Form ini menggunakan template <strong>${esc(activeTemplate.nama)}</strong> versi <strong>${esc(activeTemplate.versi)}</strong> — ${activeTemplateSections.length} seksi aktif</span>
+        ${editingDocId && canUpgradeTemplate ? `<span style="color:#E65100;font-weight:600">| Template terbaru tersedia</span>` : ''}
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:4px;font-size:10px;color:#42A5F5">
+        ${activeTemplateSections.map(s => `<span style="background:#BBDEFB;padding:1px 6px;border-radius:3px">${esc(s.label)}</span>`).join('')}
+      </div>
     </div>` : ''}
     <div class="wysiwyg-doc" id="docPaper">
       ${sectionsHtml}

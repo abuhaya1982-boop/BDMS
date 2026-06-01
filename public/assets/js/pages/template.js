@@ -428,11 +428,13 @@ function moveSectionDown(idx) {
 async function saveSectionConfig() {
   const id = window._tplSectionsId;
   const sections = window._tplSectionsEdit;
+  const enabled = sections.filter(s => s.enabled !== false);
   const konten = JSON.stringify(sections);
+  console.log('[Template] Saving config for template #' + id + ':', sections.length, 'total sections,', enabled.length, 'enabled:', enabled.map(s => s.id).join(', '));
   try {
     await API.updateTemplate(id, { konten, perubahan: 'Perubahan konfigurasi seksi template' });
     closeModal('modalGeneric');
-    showToast('Konfigurasi seksi disimpan — perubahan akan berlaku untuk dokumen IK baru', 'success');
+    showToast(`Konfigurasi disimpan (${enabled.length} seksi aktif) — berlaku untuk IK baru`, 'success');
     // Signal template change — IK form will detect and offer refresh
     window._templateLastUpdated = Date.now();
     showPage('template');
