@@ -151,7 +151,7 @@ async function previewDokumenFull(id, mode) {
   }
 }
 
-function escH(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escH(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function fmtDate(d) { if (!d) return '-'; try { return new Date(d).toLocaleDateString('id-ID',{day:'2-digit',month:'2-digit',year:'numeric'}); } catch { return d; } }
 
 function generateQRCodeSVG(data, size) {
@@ -613,12 +613,22 @@ table.step-tbl li{margin-bottom:1px}
     const arr = Array.isArray(data) ? data : [];
     if (!arr.length) return '';
     const colKeys = columns.map(c => c.toLowerCase().replace(/[\s\/]/g, '_'));
+    // Skip internal DB keys when doing positional fallback
+    const skipKeys = new Set(['id', 'dokumen_id', 'tipe']);
     return `<table class="tbl"><thead><tr><th style="width:30px">No</th>${columns.map(c=>`<th>${escH(c)}</th>`).join('')}</tr></thead>
 <tbody>${arr.map((r,i) => {
   const cells = columns.map((c,ci) => {
     let val = '';
-    if (typeof r === 'object') val = r[colKeys[ci]] || r[c] || r[Object.keys(r)[ci]] || '';
-    else val = r;
+    if (typeof r === 'object' && r !== null) {
+      // Try exact key match first, then column name, then positional (skip DB internal keys)
+      val = r[colKeys[ci]] ?? r[c] ?? '';
+      if (!val && val !== 0) {
+        const dataKeys = Object.keys(r).filter(k => !skipKeys.has(k));
+        val = (ci < dataKeys.length) ? r[dataKeys[ci]] : '';
+      }
+    } else {
+      val = r;
+    }
     return `<td>${escH(val)}</td>`;
   }).join('');
   return `<tr><td class="no">${i+1}</td>${cells}</tr>`;

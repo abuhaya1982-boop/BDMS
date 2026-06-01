@@ -1281,15 +1281,20 @@ function loadDynTable(tbodyId, data, columns) {
     const tr = document.createElement('tr');
     let html = '';
     if (hasNum) html += `<td style="text-align:center;font-size:11px">${idx + 1}</td>`;
+    const skipKeys = new Set(['id', 'dokumen_id', 'tipe']);
     columns.forEach((col, ci) => {
-      // Try to match value by column key or by index
+      // Try to match value by column key or by index (skip internal DB keys)
       let val = '';
-      if (typeof item === 'object') {
-        val = item[colKeys[ci]] || item[col] || item[Object.keys(item)[hasNum ? ci : ci]] || '';
+      if (typeof item === 'object' && item !== null) {
+        val = item[colKeys[ci]] ?? item[col] ?? '';
+        if (!val && val !== 0) {
+          const dataKeys = Object.keys(item).filter(k => !skipKeys.has(k));
+          val = (ci < dataKeys.length) ? item[dataKeys[ci]] : '';
+        }
       } else {
         val = item;
       }
-      html += `<td><input class="inline-input typewriter" value="${esc(val)}" placeholder="${esc(col)}" style="font-size:12px;width:100%"></td>`;
+      html += `<td><input class="inline-input typewriter" value="${esc(String(val ?? ''))}" placeholder="${esc(col)}" style="font-size:12px;width:100%"></td>`;
     });
     html += `<td style="width:28px;padding:0;position:relative"><div class="step-actions" style="display:flex;position:static;transform:none"><button onclick="delDynRow(this,'${tbodyId}')">${icon('x', 13)}</button></div></td>`;
     tr.innerHTML = html;
