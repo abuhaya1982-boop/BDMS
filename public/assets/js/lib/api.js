@@ -157,4 +157,11 @@ const API = {
   // Settings
   getSettings() { return this.get('settings'); },
   saveSettings(data) { return this.post('settings', data); },
+
+  // Risk Matrix
+  getRiskMatrix() { return this.get('risk-matrix'); },
+  updateRiskMatrixCell(data) { return this.put('risk-matrix/cell', data); },
+  updateRiskMatrixBulk(data) { return this.put('risk-matrix/bulk', data); },
+  updateRiskScales(scales) { return this.put('risk-matrix/scales', { scales }); },
+  resetRiskMatrix() { return this.post('risk-matrix/reset'); },
 };

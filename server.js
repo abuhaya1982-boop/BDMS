@@ -69,6 +69,7 @@ app.use('/api/laporan', require('./src/routes/laporan'));
 app.use('/api/qrcode', require('./src/routes/qrcode'));
 app.use('/api/settings', require('./src/routes/settings'));
 app.use('/api/upload', require('./src/routes/upload'));
+app.use('/api/risk-matrix', require('./src/routes/risk-matrix'));
 app.use('/api/dokumen', require('./src/routes/docx-export'));
 
 // SPA fallback — serve index.html for all non-API routes

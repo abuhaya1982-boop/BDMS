@@ -78,197 +78,7 @@ async function renderMasterData(container) {
         </div>
       </div>
       <div id="md-risiko" class="tab-content">
-        <div class="card">
-          <div class="card-header"><div class="card-title">Konfigurasi Matriks Risiko 5×5 (PLN NP Standard)</div></div>
-          <div class="card-body">
-            <div class="alert alert-info"><div class="alert-icon">${icon('info', 14)}</div><div>Matriks risiko 5×5 sesuai kebijakan manajemen risiko PLN Nusantara Power. Digunakan pada seksi Identifikasi Risiko di setiap dokumen IK.</div></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
-              <div>
-                <div class="section-heading">Skala Probabilitas (Likelihood)</div>
-                <table class="table-compact">
-                  <thead><tr><th>Kode</th><th>Level</th><th>Deskripsi</th></tr></thead>
-                  <tbody>
-                    <tr><td class="td-mono">E (5)</td><td>Hampir Pasti Terjadi</td><td style="font-size:11.5px;color:var(--text-secondary)">Terjadi di hampir semua kondisi</td></tr>
-                    <tr><td class="td-mono">D (4)</td><td>Sangat Mungkin Terjadi</td><td style="font-size:11.5px;color:var(--text-secondary)">Kemungkinan besar terjadi</td></tr>
-                    <tr><td class="td-mono">C (3)</td><td>Bisa Terjadi</td><td style="font-size:11.5px;color:var(--text-secondary)">Mungkin terjadi pada suatu waktu</td></tr>
-                    <tr><td class="td-mono">B (2)</td><td>Jarang Terjadi</td><td style="font-size:11.5px;color:var(--text-secondary)">Tidak mungkin terjadi dalam kondisi normal</td></tr>
-                    <tr><td class="td-mono">A (1)</td><td>Sangat Jarang Terjadi</td><td style="font-size:11.5px;color:var(--text-secondary)">Hanya terjadi dalam keadaan luar biasa</td></tr>
-                  </tbody>
-                </table>
-              </div>
-              <div>
-                <div class="section-heading">Skala Dampak (Impact)</div>
-                <table class="table-compact">
-                  <thead><tr><th>Level</th><th>Kategori</th><th>Deskripsi</th></tr></thead>
-                  <tbody>
-                    <tr><td class="td-mono">1</td><td>Sangat Rendah</td><td style="font-size:11.5px;color:var(--text-secondary)">Dampak minimal, kerugian rendah</td></tr>
-                    <tr><td class="td-mono">2</td><td>Rendah</td><td style="font-size:11.5px;color:var(--text-secondary)">Dampak minor, bisa ditangani internal</td></tr>
-                    <tr><td class="td-mono">3</td><td>Moderat</td><td style="font-size:11.5px;color:var(--text-secondary)">Dampak material, memerlukan tindakan</td></tr>
-                    <tr><td class="td-mono">4</td><td>Tinggi</td><td style="font-size:11.5px;color:var(--text-secondary)">Dampak besar pada operasi/keuangan</td></tr>
-                    <tr><td class="td-mono">5</td><td>Sangat Tinggi</td><td style="font-size:11.5px;color:var(--text-secondary)">Mengancam keberlangsungan usaha</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div style="margin-top:20px">
-              <div class="section-heading">Peta Risiko (Heat Map)</div>
-              <div style="overflow-x:auto">
-                <table style="border-collapse:collapse;width:100%;font-family:'Inter',sans-serif;font-size:11px;text-align:center;table-layout:fixed">
-                  <tr>
-                    <td rowspan="6" style="border:1px solid #999;background:#F5F5F5;font-weight:700;writing-mode:vertical-lr;transform:rotate(180deg);padding:8px 4px;font-size:12px;width:28px">Probabilitas</td>
-                    <td style="border:1px solid #999;background:#F5F5F5;font-weight:600;padding:6px 4px;width:110px">Hampir Pasti Terjadi<br><b>E</b></td>
-                    <td style="border:1px solid #999;background:#92D050;padding:6px;font-weight:600"><div style="font-size:9px;opacity:0.8">LOW TO MODERATE</div><div style="font-size:14px;font-weight:800">7</div></td>
-                    <td style="border:1px solid #999;background:#FFFF00;padding:6px;font-weight:600"><div style="font-size:9px;opacity:0.8">MODERATE</div><div style="font-size:14px;font-weight:800">12</div></td>
-                    <td style="border:1px solid #999;background:#FFC000;padding:6px;font-weight:600"><div style="font-size:9px;opacity:0.8">MODERATE TO HIGH</div><div style="font-size:14px;font-weight:800">17</div></td>
-                    <td style="border:1px solid #999;background:#FF0000;padding:6px;font-weight:600;color:#fff"><div style="font-size:9px;opacity:0.9">HIGH</div><div style="font-size:14px;font-weight:800">22</div></td>
-                    <td style="border:1px solid #999;background:#FF0000;padding:6px;font-weight:600;color:#fff"><div style="font-size:9px;opacity:0.9">HIGH</div><div style="font-size:14px;font-weight:800">25</div></td>
-                  </tr>
-                  <tr>
-                    <td style="border:1px solid #999;background:#F5F5F5;font-weight:600;padding:6px 4px">Sangat Mungkin Terjadi<br><b>D</b></td>
-                    <td style="border:1px solid #999;background:#00B050;padding:6px;font-weight:600;color:#fff"><div style="font-size:9px;opacity:0.9">LOW</div><div style="font-size:14px;font-weight:800">4</div></td>
-                    <td style="border:1px solid #999;background:#92D050;padding:6px;font-weight:600"><div style="font-size:9px;opacity:0.8">LOW TO MODERATE</div><div style="font-size:14px;font-weight:800">9</div></td>
-                    <td style="border:1px solid #999;background:#FFFF00;padding:6px;font-weight:600"><div style="font-size:9px;opacity:0.8">MODERATE</div><div style="font-size:14px;font-weight:800">14</div></td>
-                    <td style="border:1px solid #999;background:#FFC000;padding:6px;font-weight:600"><div style="font-size:9px;opacity:0.8">MODERATE TO HIGH</div><div style="font-size:14px;font-weight:800">19</div></td>
-                    <td style="border:1px solid #999;background:#FF0000;padding:6px;font-weight:600;color:#fff"><div style="font-size:9px;opacity:0.9">HIGH</div><div style="font-size:14px;font-weight:800">24</div></td>
-                  </tr>
-                  <tr>
-                    <td style="border:1px solid #999;background:#F5F5F5;font-weight:600;padding:6px 4px">Bisa Terjadi<br><b>C</b></td>
-                    <td style="border:1px solid #999;background:#00B050;padding:6px;font-weight:600;color:#fff"><div style="font-size:9px;opacity:0.9">LOW</div><div style="font-size:14px;font-weight:800">3</div></td>
-                    <td style="border:1px solid #999;background:#92D050;padding:6px;font-weight:600"><div style="font-size:9px;opacity:0.8">LOW TO MODERATE</div><div style="font-size:14px;font-weight:800">8</div></td>
-                    <td style="border:1px solid #999;background:#FFFF00;padding:6px;font-weight:600"><div style="font-size:9px;opacity:0.8">MODERATE</div><div style="font-size:14px;font-weight:800">11</div></td>
-                    <td style="border:1px solid #999;background:#FFC000;padding:6px;font-weight:600"><div style="font-size:9px;opacity:0.8">MODERATE TO HIGH</div><div style="font-size:14px;font-weight:800">18</div></td>
-                    <td style="border:1px solid #999;background:#FF0000;padding:6px;font-weight:600;color:#fff"><div style="font-size:9px;opacity:0.9">HIGH</div><div style="font-size:14px;font-weight:800">23</div></td>
-                  </tr>
-                  <tr>
-                    <td style="border:1px solid #999;background:#F5F5F5;font-weight:600;padding:6px 4px">Jarang Terjadi<br><b>B</b></td>
-                    <td style="border:1px solid #999;background:#00B050;padding:6px;font-weight:600;color:#fff"><div style="font-size:9px;opacity:0.9">LOW</div><div style="font-size:14px;font-weight:800">2</div></td>
-                    <td style="border:1px solid #999;background:#92D050;padding:6px;font-weight:600"><div style="font-size:9px;opacity:0.8">LOW TO MODERATE</div><div style="font-size:14px;font-weight:800">6</div></td>
-                    <td style="border:1px solid #999;background:#92D050;padding:6px;font-weight:600"><div style="font-size:9px;opacity:0.8">LOW TO MODERATE</div><div style="font-size:14px;font-weight:800">8</div></td>
-                    <td style="border:1px solid #999;background:#FFC000;padding:6px;font-weight:600"><div style="font-size:9px;opacity:0.8">MODERATE TO HIGH</div><div style="font-size:14px;font-weight:800">16</div></td>
-                    <td style="border:1px solid #999;background:#FF0000;padding:6px;font-weight:600;color:#fff"><div style="font-size:9px;opacity:0.9">HIGH</div><div style="font-size:14px;font-weight:800">21</div></td>
-                  </tr>
-                  <tr>
-                    <td style="border:1px solid #999;background:#F5F5F5;font-weight:600;padding:6px 4px">Sangat Jarang Terjadi<br><b>A</b></td>
-                    <td style="border:1px solid #999;background:#00B050;padding:6px;font-weight:600;color:#fff"><div style="font-size:9px;opacity:0.9">LOW</div><div style="font-size:14px;font-weight:800">1</div></td>
-                    <td style="border:1px solid #999;background:#00B050;padding:6px;font-weight:600;color:#fff"><div style="font-size:9px;opacity:0.9">LOW</div><div style="font-size:14px;font-weight:800">5</div></td>
-                    <td style="border:1px solid #999;background:#92D050;padding:6px;font-weight:600"><div style="font-size:9px;opacity:0.8">LOW TO MODERATE</div><div style="font-size:14px;font-weight:800">10</div></td>
-                    <td style="border:1px solid #999;background:#FFFF00;padding:6px;font-weight:600"><div style="font-size:9px;opacity:0.8">MODERATE</div><div style="font-size:14px;font-weight:800">15</div></td>
-                    <td style="border:1px solid #999;background:#FF0000;padding:6px;font-weight:600;color:#fff"><div style="font-size:9px;opacity:0.9">HIGH</div><div style="font-size:14px;font-weight:800">20</div></td>
-                  </tr>
-                  <tr>
-                    <td style="border:none"></td>
-                    <td style="border:1px solid #999;background:#F5F5F5;font-weight:600;padding:6px">Sangat Rendah<br><b>1</b></td>
-                    <td style="border:1px solid #999;background:#F5F5F5;font-weight:600;padding:6px">Rendah<br><b>2</b></td>
-                    <td style="border:1px solid #999;background:#F5F5F5;font-weight:600;padding:6px">Moderat<br><b>3</b></td>
-                    <td style="border:1px solid #999;background:#F5F5F5;font-weight:600;padding:6px">Tinggi<br><b>4</b></td>
-                    <td style="border:1px solid #999;background:#F5F5F5;font-weight:600;padding:6px">Sangat Tinggi<br><b>5</b></td>
-                  </tr>
-                  <tr>
-                    <td style="border:none"></td>
-                    <td style="border:none"></td>
-                    <td colspan="5" style="border:1px solid #999;background:#F5F5F5;font-weight:700;font-size:12px;padding:6px">Dampak</td>
-                  </tr>
-                </table>
-              </div>
-            </div>
-            <div style="margin-top:16px;display:grid;grid-template-columns:repeat(5,1fr);gap:8px;font-size:11px;font-family:'Inter',sans-serif">
-              <div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:20px;height:14px;background:#00B050;border:1px solid #999;border-radius:2px"></span><b>LOW</b> (1–4)</div>
-              <div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:20px;height:14px;background:#92D050;border:1px solid #999;border-radius:2px"></span><b>LOW TO MODERATE</b> (5–9)</div>
-              <div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:20px;height:14px;background:#FFFF00;border:1px solid #999;border-radius:2px"></span><b>MODERATE</b> (10–14)</div>
-              <div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:20px;height:14px;background:#FFC000;border:1px solid #999;border-radius:2px"></span><b>MODERATE TO HIGH</b> (15–19)</div>
-              <div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:20px;height:14px;background:#FF0000;border:1px solid #999;border-radius:2px"></span><b>HIGH</b> (20–25)</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ═══ INFORMASI PELENGKAP (Sumber: Kebijakan Manajemen Risiko PLN NP) ═══ -->
-        <div class="card" style="margin-top:16px">
-          <div class="card-header">
-            <div class="card-title">${icon('book-open', 16)} Referensi Penilaian Risiko PLN Nusantara Power</div>
-            <span class="badge badge-sky" style="font-size:10px">Informasi Pelengkap</span>
-          </div>
-          <div class="card-body">
-            <div class="alert alert-warning" style="margin-bottom:16px"><div class="alert-icon">${icon('alert-triangle', 14)}</div><div style="font-size:12px">Data berikut merupakan <strong>informasi pelengkap referensi</strong> dari kebijakan manajemen risiko PLN Nusantara Power. <strong>Tidak dimasukkan ke dalam format dokumen IK</strong>, melainkan sebagai panduan bagi penyusun saat mengisi seksi Identifikasi Risiko.</div></div>
-
-            <div style="margin-bottom:20px">
-              <div class="section-heading">Kriteria Dampak (Impact Criteria)</div>
-              <div style="overflow-x:auto">
-                <table class="table-compact" style="font-size:11.5px">
-                  <thead>
-                    <tr>
-                      <th style="width:110px">Tingkat Dampak</th>
-                      <th style="width:260px">Parameter Kuantitatif (Keuangan)</th>
-                      <th>Parameter Kualitatif</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td><span class="badge badge-success" style="font-size:10px">Sangat Rendah</span></td>
-                      <td style="font-size:11px;font-family:var(--mono)">(X &le; 20% dari limit risiko)<br>X &le; Rp 3.033.633.923</td>
-                      <td style="color:var(--text-secondary)">Melibatkan kelalaian umum</td>
-                    </tr>
-                    <tr>
-                      <td><span class="badge badge-sky" style="font-size:10px">Rendah</span></td>
-                      <td style="font-size:11px;font-family:var(--mono)">(20% &lt; X &le; 40%)<br>Rp 3.033.633.923 &lt; X &le; Rp 6.067.267.847</td>
-                      <td style="color:var(--text-secondary)">Melibatkan kelalaian umum, dapat melemahkan reputasi dan tidak ada indikasi potensi disrupsi operasi dan kerugian jiwa</td>
-                    </tr>
-                    <tr>
-                      <td><span class="badge badge-amber" style="font-size:10px">Moderat</span></td>
-                      <td style="font-size:11px;font-family:var(--mono)">(40% &lt; X &le; 60%)<br>Rp 6.067.267.847 &lt; X &le; Rp 9.101.501.770</td>
-                      <td style="color:var(--text-secondary)">Melibatkan tindakan salah kelola umum, cacat tidak tetap/ketidakhadiran kerja yang terbatas, dapat merusak reputasi BUMN dan ada potensi disrupsi operasional</td>
-                    </tr>
-                    <tr>
-                      <td><span class="badge badge-warning" style="font-size:10px">Tinggi</span></td>
-                      <td style="font-size:11px;font-family:var(--mono)">(60% &lt; X &le; 80%)<br>Rp 9.101.501.770 &lt; X &le; Rp 12.135.335.693</td>
-                      <td style="color:var(--text-secondary)">Melibatkan <em>gross negligence</em>, keselamatan perorangan, dan melibatkan penurunan reputasi dan kepercayaan publik pada BUMN, terjadi disrupsi operasional untuk periode di bawah 1 bulan</td>
-                    </tr>
-                    <tr>
-                      <td><span class="badge badge-danger" style="font-size:10px">Sangat Tinggi</span></td>
-                      <td style="font-size:11px;font-family:var(--mono)">(X &gt; 80% dari limit risiko)<br>X &gt; Rp 12.135.335.693</td>
-                      <td style="color:var(--text-secondary)">Melibatkan <em>fraud</em>, pelanggaran peraturan perundang-undangan, disrupsi operasi &gt; 1 bulan, melibatkan kerugian jiwa, atau penurunan reputasi signifikan yang berdampak sistemik dan sektor</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div style="margin-top:8px;padding:8px 12px;background:var(--surface-2);border-radius:var(--radius);border-left:3px solid var(--pln-blue-600);font-size:12px">
-                <strong>Nilai Limit UP Brantas:</strong> <span style="font-family:var(--mono);font-weight:700;color:var(--pln-blue-600)">Rp 15.168.169.617</span>
-              </div>
-            </div>
-
-            <div style="margin-bottom:20px">
-              <div class="section-heading">Kriteria Probabilitas (Likelihood Criteria)</div>
-              <div style="overflow-x:auto">
-                <table class="table-compact" style="font-size:11.5px">
-                  <thead>
-                    <tr><th style="width:180px">Tingkat Probabilitas</th><th>Parameter Probabilitas</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr><td>Sangat Jarang Terjadi <span class="td-mono">(A)</span></td><td style="color:var(--text-secondary)">Probabilitas kejadian di bawah 20%</td></tr>
-                    <tr><td>Jarang Terjadi <span class="td-mono">(B)</span></td><td style="color:var(--text-secondary)">Probabilitas kejadian antara 20% sampai dengan 40%</td></tr>
-                    <tr><td>Bisa Terjadi <span class="td-mono">(C)</span></td><td style="color:var(--text-secondary)">Probabilitas kejadian antara 40% sampai dengan 60%</td></tr>
-                    <tr><td>Sangat Mungkin Terjadi <span class="td-mono">(D)</span></td><td style="color:var(--text-secondary)">Probabilitas kejadian antara 60% sampai dengan 80%</td></tr>
-                    <tr><td>Hampir Pasti Terjadi <span class="td-mono">(E)</span></td><td style="color:var(--text-secondary)">Probabilitas kejadian antara 80% sampai dengan 100%</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div>
-              <div class="section-heading">Definisi Level Risiko</div>
-              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                <div style="padding:12px 14px;background:var(--surface-2);border-radius:var(--radius);border-left:3px solid var(--warning)">
-                  <div style="font-weight:700;font-size:12.5px;margin-bottom:4px">Level Risiko Inheren</div>
-                  <div style="font-size:12px;color:var(--text-secondary)">Risiko yang masih melekat setelah memperhitungkan <em>existing control</em> (kontrol yang ada) yang dijalankan dalam aktivitas proses bisnis.</div>
-                </div>
-                <div style="padding:12px 14px;background:var(--surface-2);border-radius:var(--radius);border-left:3px solid var(--success)">
-                  <div style="font-weight:700;font-size:12.5px;margin-bottom:4px">Level Risiko Residual</div>
-                  <div style="font-size:12px;color:var(--text-secondary)">Risiko yang masih melekat setelah dilakukan perlakuan risiko (<em>risk treatment</em>).</div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
+        <div id="md-risiko-content"><div style="text-align:center;padding:40px;color:var(--text-tertiary)">Memuat matriks risiko...</div></div>
       </div>
       <div id="md-nomor" class="tab-content">
         <div class="card">
@@ -323,6 +133,10 @@ function switchMDTab(el, contentId) {
   document.querySelectorAll('#page-master-data .tab-content').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   document.getElementById(contentId)?.classList.add('active');
+  // Lazy-load risk matrix when tab is first activated
+  if (contentId === 'md-risiko' && !_riskMatrixData.matrix.length) {
+    loadRiskMatrix();
+  }
 }
 
 function openAddUnitModal() {
@@ -554,4 +368,206 @@ function filterProbisMD() {
   document.getElementById('mdProbisBody').innerHTML = renderProbisRowsMD(list);
   document.getElementById('mdProbisCount').textContent = list.length + ' item';
   renderIcons();
+}
+
+// ═══════════════════════════════════════════════════
+// MATRIKS RISIKO — Dynamic CRUD from DB
+// ═══════════════════════════════════════════════════
+let _riskMatrixData = { matrix: [], scales: [] };
+const LEVEL_OPTIONS = ['LOW','LOW TO MODERATE','MODERATE','MODERATE TO HIGH','HIGH'];
+const COLOR_OPTIONS = ['#00B050','#92D050','#FFFF00','#FFC000','#FF0000'];
+
+async function loadRiskMatrix() {
+  const el = document.getElementById('md-risiko-content');
+  if (!el) return;
+  try {
+    const res = await API.getRiskMatrix();
+    _riskMatrixData = res.data || { matrix: [], scales: [] };
+    renderRiskMatrixTab();
+  } catch (e) {
+    el.innerHTML = `<div class="alert alert-danger">${esc(e.message)}</div>`;
+  }
+}
+
+function _rmLookup(p, i) {
+  return _riskMatrixData.matrix.find(m => m.probability === p && m.impact === i) || { score: '-', level: '-', color: '#ccc' };
+}
+
+function _scaleByType(tipe) {
+  return (_riskMatrixData.scales || []).filter(s => s.tipe === tipe).sort((a, b) => a.nilai - b.nilai);
+}
+
+function _textColor(bg) {
+  if (!bg) return '#000';
+  const hex = bg.replace('#', '');
+  const r = parseInt(hex.substr(0, 2), 16), g = parseInt(hex.substr(2, 2), 16), b = parseInt(hex.substr(4, 2), 16);
+  return (r * 0.299 + g * 0.587 + b * 0.114) > 160 ? '#000' : '#fff';
+}
+
+function renderRiskMatrixTab() {
+  const el = document.getElementById('md-risiko-content');
+  if (!el) return;
+  const isSuperAdmin = APP.user?.role === 'Super Admin' || APP.user?.original_role === 'Super Admin';
+  const probScales = _scaleByType('probability');
+  const impScales = _scaleByType('impact');
+
+  // Build heat map rows (probability 5→1, top to bottom)
+  let heatRows = '';
+  for (let p = 5; p >= 1; p--) {
+    const ps = probScales.find(s => s.nilai === p) || { kode: p, label: 'Level ' + p };
+    let cells = `<td style="border:1px solid #999;background:#F5F5F5;font-weight:600;padding:6px 4px;width:120px;font-size:11px">${esc(ps.label)}<br><b>${esc(ps.kode)}</b></td>`;
+    for (let i = 1; i <= 5; i++) {
+      const c = _rmLookup(p, i);
+      const tc = _textColor(c.color);
+      const clickAttr = isSuperAdmin ? ` onclick="openEditRiskCell(${p},${i})" style="cursor:pointer;border:1px solid #999;background:${c.color};padding:6px;font-weight:600;color:${tc}" title="Klik untuk edit"` : ` style="border:1px solid #999;background:${c.color};padding:6px;font-weight:600;color:${tc}"`;
+      cells += `<td${clickAttr}><div style="font-size:9px;opacity:0.85">${esc(c.level)}</div><div style="font-size:14px;font-weight:800">${c.score}</div></td>`;
+    }
+    heatRows += `<tr>${p === 5 ? '<td rowspan="5" style="border:1px solid #999;background:#F5F5F5;font-weight:700;writing-mode:vertical-lr;transform:rotate(180deg);padding:8px 4px;font-size:12px;width:28px">Probabilitas</td>' : ''}${cells}</tr>`;
+  }
+  // Impact footer row
+  let impFooter = '<td style="border:none"></td>';
+  for (let i = 1; i <= 5; i++) {
+    const is2 = impScales.find(s => s.nilai === i) || { label: 'Level ' + i };
+    impFooter += `<td style="border:1px solid #999;background:#F5F5F5;font-weight:600;padding:6px;font-size:11px">${esc(is2.label)}<br><b>${i}</b></td>`;
+  }
+
+  // Probability scale table
+  const probRows = probScales.map(s => `<tr>
+    <td class="td-mono">${esc(s.kode)} (${s.nilai})</td>
+    <td style="font-weight:500">${esc(s.label)}</td>
+    <td style="font-size:11.5px;color:var(--text-secondary)">${esc(s.deskripsi || '')}</td>
+    ${isSuperAdmin ? `<td><button class="btn btn-secondary btn-xs" onclick="openEditScale('probability',${s.nilai})">${icon('edit-3', 12)}</button></td>` : ''}
+  </tr>`).join('');
+
+  const impRows = impScales.map(s => `<tr>
+    <td class="td-mono">${s.nilai}</td>
+    <td style="font-weight:500">${esc(s.label)}</td>
+    <td style="font-size:11.5px;color:var(--text-secondary)">${esc(s.deskripsi || '')}</td>
+    ${isSuperAdmin ? `<td><button class="btn btn-secondary btn-xs" onclick="openEditScale('impact',${s.nilai})">${icon('edit-3', 12)}</button></td>` : ''}
+  </tr>`).join('');
+
+  el.innerHTML = `
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">${icon('grid-3x3', 14)} Matriks Risiko 5×5</div>
+        <div style="display:flex;gap:6px">
+          ${isSuperAdmin ? `<button class="btn btn-danger btn-sm" onclick="resetRiskMatrixDefault()">${icon('rotate-ccw', 13)} Reset Default</button>` : ''}
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="alert alert-info" style="margin-bottom:14px"><div class="alert-icon">${icon('info', 14)}</div><div style="font-size:12px">Matriks risiko 5×5 sesuai kebijakan manajemen risiko PLN Nusantara Power. Digunakan pada seksi <strong>Identifikasi Risiko</strong> di setiap dokumen IK.${isSuperAdmin ? ' <strong>Klik sel matriks untuk mengedit.</strong>' : ''}</div></div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+          <div>
+            <div class="section-heading">Skala Probabilitas (Likelihood)</div>
+            <table class="table-compact">
+              <thead><tr><th>Kode</th><th>Level</th><th>Deskripsi</th>${isSuperAdmin ? '<th style="width:40px"></th>' : ''}</tr></thead>
+              <tbody>${probRows}</tbody>
+            </table>
+          </div>
+          <div>
+            <div class="section-heading">Skala Dampak (Impact)</div>
+            <table class="table-compact">
+              <thead><tr><th>Level</th><th>Kategori</th><th>Deskripsi</th>${isSuperAdmin ? '<th style="width:40px"></th>' : ''}</tr></thead>
+              <tbody>${impRows}</tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style="margin-top:20px">
+          <div class="section-heading">Peta Risiko (Heat Map)${isSuperAdmin ? ' — <span style="font-weight:400;color:var(--text-tertiary)">klik sel untuk edit</span>' : ''}</div>
+          <div style="overflow-x:auto">
+            <table style="border-collapse:collapse;width:100%;font-family:'Inter',sans-serif;font-size:11px;text-align:center;table-layout:fixed">
+              ${heatRows}
+              <tr>${impFooter}</tr>
+              <tr><td style="border:none"></td><td style="border:none"></td><td colspan="5" style="border:1px solid #999;background:#F5F5F5;font-weight:700;font-size:12px;padding:6px">Dampak</td></tr>
+            </table>
+          </div>
+        </div>
+
+        <div style="margin-top:16px;display:grid;grid-template-columns:repeat(5,1fr);gap:8px;font-size:11px">
+          ${LEVEL_OPTIONS.map((l, idx) => `<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:20px;height:14px;background:${COLOR_OPTIONS[idx]};border:1px solid #999;border-radius:2px"></span><b>${l}</b></div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+  renderIcons();
+}
+
+function openEditRiskCell(prob, imp) {
+  const c = _rmLookup(prob, imp);
+  const levelOpts = LEVEL_OPTIONS.map(l => `<option value="${l}" ${c.level === l ? 'selected' : ''}>${l}</option>`).join('');
+  const colorOpts = COLOR_OPTIONS.map(cl => `<option value="${cl}" ${c.color === cl ? 'selected' : ''} style="background:${cl};color:${_textColor(cl)}">${cl}</option>`).join('');
+  openGenericModal(
+    `Edit Sel Risiko [P=${prob}, I=${imp}]`,
+    `<div class="form-grid" style="grid-template-columns:1fr 1fr">
+      <div class="form-group"><label class="form-label">Score</label>
+        <input type="number" class="form-control" id="rm-score" value="${c.score}" min="1" max="25"></div>
+      <div class="form-group"><label class="form-label">Level</label>
+        <select class="form-control" id="rm-level">${levelOpts}</select></div>
+      <div class="form-group"><label class="form-label">Warna</label>
+        <select class="form-control" id="rm-color" onchange="document.getElementById('rm-color-preview').style.background=this.value">${colorOpts}</select></div>
+      <div class="form-group"><label class="form-label">Preview</label>
+        <div id="rm-color-preview" style="width:100%;height:36px;border-radius:6px;border:1px solid #999;background:${c.color}"></div></div>
+    </div>`,
+    `<button class="btn btn-secondary" onclick="closeModal('modalGeneric')">Batal</button>
+     <button class="btn btn-primary" onclick="saveRiskCell(${prob},${imp})">${icon('save', 14)} Simpan</button>`
+  );
+  renderIcons();
+}
+
+async function saveRiskCell(prob, imp) {
+  const score = parseInt(document.getElementById('rm-score')?.value);
+  const level = document.getElementById('rm-level')?.value;
+  const color = document.getElementById('rm-color')?.value;
+  if (!score || !level || !color) { showToast('Semua field wajib diisi', 'error'); return; }
+  try {
+    await API.updateRiskMatrixCell({ probability: prob, impact: imp, score, level, color });
+    closeModal('modalGeneric');
+    showToast('Sel risiko diperbarui', 'success');
+    await loadRiskMatrix();
+  } catch (e) { showToast('Gagal: ' + e.message, 'error'); }
+}
+
+function openEditScale(tipe, nilai) {
+  const s = (_riskMatrixData.scales || []).find(x => x.tipe === tipe && x.nilai === nilai);
+  if (!s) return;
+  const label = tipe === 'probability' ? 'Probabilitas' : 'Dampak';
+  openGenericModal(
+    `Edit Skala ${label}: Level ${nilai}`,
+    `<div class="form-grid">
+      <div class="form-group"><label class="form-label">Kode</label>
+        <input type="text" class="form-control mono" id="rs-kode" value="${esc(s.kode || '')}" maxlength="4" style="width:80px"></div>
+      <div class="form-group"><label class="form-label">Label</label>
+        <input type="text" class="form-control" id="rs-label" value="${esc(s.label)}"></div>
+      <div class="form-group" style="grid-column:span 2"><label class="form-label">Deskripsi</label>
+        <input type="text" class="form-control" id="rs-desk" value="${esc(s.deskripsi || '')}"></div>
+    </div>`,
+    `<button class="btn btn-secondary" onclick="closeModal('modalGeneric')">Batal</button>
+     <button class="btn btn-primary" onclick="saveScale('${tipe}',${nilai})">${icon('save', 14)} Simpan</button>`
+  );
+  renderIcons();
+}
+
+async function saveScale(tipe, nilai) {
+  const kode = document.getElementById('rs-kode')?.value;
+  const label = document.getElementById('rs-label')?.value;
+  const deskripsi = document.getElementById('rs-desk')?.value;
+  if (!label) { showToast('Label wajib diisi', 'error'); return; }
+  try {
+    await API.updateRiskScales([{ tipe, nilai, kode, label, deskripsi }]);
+    closeModal('modalGeneric');
+    showToast('Skala diperbarui', 'success');
+    await loadRiskMatrix();
+  } catch (e) { showToast('Gagal: ' + e.message, 'error'); }
+}
+
+async function resetRiskMatrixDefault() {
+  const ok = await renderConfirmDialog('Reset Matriks Risiko', 'Yakin ingin mereset matriks risiko ke standar default PLN Nusantara Power?<br><br>Semua kustomisasi akan <strong>hilang</strong>.', 'Reset', 'Batal');
+  if (!ok) return;
+  try {
+    await API.resetRiskMatrix();
+    showToast('Matriks risiko direset ke default', 'success');
+    await loadRiskMatrix();
+  } catch (e) { showToast('Gagal: ' + e.message, 'error'); }
 }

@@ -37,6 +37,33 @@ function migrateDB(db) {
   for (const [table, col, type] of safeCols) {
     try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch(e) { /* already exists */ }
   }
+
+  // ── Risk Matrix table (added v3.1) ──
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS risk_matrix (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        probability INTEGER NOT NULL CHECK(probability BETWEEN 1 AND 5),
+        impact INTEGER NOT NULL CHECK(impact BETWEEN 1 AND 5),
+        score INTEGER NOT NULL,
+        level TEXT NOT NULL,
+        color TEXT NOT NULL DEFAULT '#CCCCCC',
+        UNIQUE(probability, impact)
+      );
+      CREATE TABLE IF NOT EXISTS risk_scales (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tipe TEXT NOT NULL CHECK(tipe IN ('probability','impact')),
+        nilai INTEGER NOT NULL CHECK(nilai BETWEEN 1 AND 5),
+        kode TEXT,
+        label TEXT NOT NULL,
+        deskripsi TEXT,
+        UNIQUE(tipe, nilai)
+      );
+    `);
+    // Seed if empty
+    const cnt = db.prepare("SELECT COUNT(*) as c FROM risk_matrix").get().c;
+    if (cnt === 0) seedRiskMatrix(db);
+  } catch(e) { /* already exists or other non-fatal */ }
 }
 
 function autoInit(db) {
@@ -227,6 +254,25 @@ function autoInit(db) {
       created_at TEXT DEFAULT (datetime('now','localtime')), used_at TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS risk_matrix (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      probability INTEGER NOT NULL CHECK(probability BETWEEN 1 AND 5),
+      impact INTEGER NOT NULL CHECK(impact BETWEEN 1 AND 5),
+      score INTEGER NOT NULL,
+      level TEXT NOT NULL,
+      color TEXT NOT NULL DEFAULT '#CCCCCC',
+      UNIQUE(probability, impact)
+    );
+    CREATE TABLE IF NOT EXISTS risk_scales (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tipe TEXT NOT NULL CHECK(tipe IN ('probability','impact')),
+      nilai INTEGER NOT NULL CHECK(nilai BETWEEN 1 AND 5),
+      kode TEXT,
+      label TEXT NOT NULL,
+      deskripsi TEXT,
+      UNIQUE(tipe, nilai)
+    );
   `);
 
   // ═══ INDEXES ═══
@@ -374,7 +420,41 @@ function autoInit(db) {
       (1, 'Sistem siap digunakan', 'Brantas DMS telah aktif.', '???', '#E3FCEF');
   `);
 
+  // Risk Matrix seed
+  seedRiskMatrix(db);
+
   console.log('Database initialized successfully');
+}
+
+// ═══ SEED RISK MATRIX (PLN NP Standard 5×5) ═══
+function seedRiskMatrix(db) {
+  // Score matrix — PLN NP standard
+  const matrix = [
+    // [prob, impact, score, level, color]
+    [1,1,1,'LOW','#00B050'],[1,2,5,'LOW','#00B050'],[1,3,10,'LOW TO MODERATE','#92D050'],[1,4,15,'MODERATE','#FFFF00'],[1,5,20,'HIGH','#FF0000'],
+    [2,1,2,'LOW','#00B050'],[2,2,6,'LOW TO MODERATE','#92D050'],[2,3,8,'LOW TO MODERATE','#92D050'],[2,4,16,'MODERATE TO HIGH','#FFC000'],[2,5,21,'HIGH','#FF0000'],
+    [3,1,3,'LOW','#00B050'],[3,2,8,'LOW TO MODERATE','#92D050'],[3,3,11,'MODERATE','#FFFF00'],[3,4,18,'MODERATE TO HIGH','#FFC000'],[3,5,23,'HIGH','#FF0000'],
+    [4,1,4,'LOW','#00B050'],[4,2,9,'LOW TO MODERATE','#92D050'],[4,3,14,'MODERATE','#FFFF00'],[4,4,19,'MODERATE TO HIGH','#FFC000'],[4,5,24,'HIGH','#FF0000'],
+    [5,1,7,'LOW TO MODERATE','#92D050'],[5,2,12,'MODERATE','#FFFF00'],[5,3,17,'MODERATE TO HIGH','#FFC000'],[5,4,22,'HIGH','#FF0000'],[5,5,25,'HIGH','#FF0000'],
+  ];
+  const stmt = db.prepare('INSERT OR IGNORE INTO risk_matrix (probability,impact,score,level,color) VALUES (?,?,?,?,?)');
+  for (const r of matrix) stmt.run(...r);
+
+  // Probability scales
+  const probStmt = db.prepare('INSERT OR IGNORE INTO risk_scales (tipe,nilai,kode,label,deskripsi) VALUES (?,?,?,?,?)');
+  probStmt.run('probability',1,'A','Sangat Jarang Terjadi','Probabilitas kejadian di bawah 20%');
+  probStmt.run('probability',2,'B','Jarang Terjadi','Probabilitas kejadian antara 20% sampai dengan 40%');
+  probStmt.run('probability',3,'C','Bisa Terjadi','Probabilitas kejadian antara 40% sampai dengan 60%');
+  probStmt.run('probability',4,'D','Sangat Mungkin Terjadi','Probabilitas kejadian antara 60% sampai dengan 80%');
+  probStmt.run('probability',5,'E','Hampir Pasti Terjadi','Probabilitas kejadian antara 80% sampai dengan 100%');
+
+  // Impact scales
+  const impStmt = db.prepare('INSERT OR IGNORE INTO risk_scales (tipe,nilai,kode,label,deskripsi) VALUES (?,?,?,?,?)');
+  impStmt.run('impact',1,'1','Sangat Rendah','Dampak minimal, kerugian rendah');
+  impStmt.run('impact',2,'2','Rendah','Dampak minor, bisa ditangani internal');
+  impStmt.run('impact',3,'3','Moderat','Dampak material, memerlukan tindakan');
+  impStmt.run('impact',4,'4','Tinggi','Dampak besar pada operasi/keuangan');
+  impStmt.run('impact',5,'5','Sangat Tinggi','Mengancam keberlangsungan usaha');
 }
 
 function _reset() {

@@ -23,15 +23,35 @@ const CLR = { primary: '2A7489', dark: '000000', gray: '808080', headerBg: 'D9E2
 let LOGO_BUF = null;
 try { LOGO_BUF = fs.readFileSync(path.join(__dirname, '..', 'assets', 'logo-pln-np.jpeg')); } catch {}
 
-// PLN NP Risk Matrix 5x5
-const RISK_MATRIX = {
+// PLN NP Risk Matrix 5x5 — fallback if DB not available
+const RISK_MATRIX_FALLBACK = {
   '1-1':{s:1,l:'LOW',c:'00B050'},'1-2':{s:5,l:'LOW',c:'00B050'},'1-3':{s:10,l:'LOW TO MODERATE',c:'92D050'},'1-4':{s:15,l:'MODERATE',c:'FFFF00'},'1-5':{s:20,l:'HIGH',c:'FF0000'},
   '2-1':{s:2,l:'LOW',c:'00B050'},'2-2':{s:6,l:'LOW TO MODERATE',c:'92D050'},'2-3':{s:8,l:'LOW TO MODERATE',c:'92D050'},'2-4':{s:16,l:'MODERATE TO HIGH',c:'FFC000'},'2-5':{s:21,l:'HIGH',c:'FF0000'},
   '3-1':{s:3,l:'LOW',c:'00B050'},'3-2':{s:8,l:'LOW TO MODERATE',c:'92D050'},'3-3':{s:11,l:'MODERATE',c:'FFFF00'},'3-4':{s:18,l:'MODERATE TO HIGH',c:'FFC000'},'3-5':{s:23,l:'HIGH',c:'FF0000'},
   '4-1':{s:4,l:'LOW',c:'00B050'},'4-2':{s:9,l:'LOW TO MODERATE',c:'92D050'},'4-3':{s:14,l:'MODERATE',c:'FFFF00'},'4-4':{s:19,l:'MODERATE TO HIGH',c:'FFC000'},'4-5':{s:24,l:'HIGH',c:'FF0000'},
   '5-1':{s:7,l:'LOW TO MODERATE',c:'92D050'},'5-2':{s:12,l:'MODERATE',c:'FFFF00'},'5-3':{s:17,l:'MODERATE TO HIGH',c:'FFC000'},'5-4':{s:22,l:'HIGH',c:'FF0000'},'5-5':{s:25,l:'HIGH',c:'FF0000'},
 };
-const rmLookup = (p, d) => RISK_MATRIX[`${p}-${d}`] || { s: '-', l: '-', c: 'CCCCCC' };
+
+// Load risk matrix from DB, merging with fallback
+function loadRiskMatrixFromDB() {
+  const rm = {};
+  try {
+    const rows = getDB().prepare("SELECT * FROM risk_matrix").all();
+    for (const r of rows) {
+      rm[`${r.probability}-${r.impact}`] = { s: r.score, l: r.level, c: r.color.replace('#', '') };
+    }
+  } catch(e) { /* table might not exist yet */ }
+  // Merge: DB values override fallback
+  return Object.keys(RISK_MATRIX_FALLBACK).length ? { ...RISK_MATRIX_FALLBACK, ...rm } : rm;
+}
+
+// Cached matrix — refreshed per export request via resetRmCache()
+let _rmCache = null;
+function resetRmCache() { _rmCache = null; }
+const rmLookup = (p, d) => {
+  if (!_rmCache) _rmCache = loadRiskMatrixFromDB();
+  return _rmCache[`${p}-${d}`] || { s: '-', l: '-', c: 'CCCCCC' };
+};
 
 // Heat map row labels (Indonesian) matching template
 const HM_ROWS = [
@@ -858,6 +878,7 @@ function buildDocx(doc, data) {
 // ═══ ROUTE: GET /api/dokumen/:id/docx ═══
 router.get('/:id/docx', h.requireAuth, async (req, res) => {
   try {
+    resetRmCache(); // refresh risk matrix from DB for this export
     const db = getDB();
     const doc = db.prepare(`
       SELECT d.*, u.nama as unit_nama, u.kode_dokumen, p.nama as probis_nama,
