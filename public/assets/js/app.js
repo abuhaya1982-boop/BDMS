@@ -1010,8 +1010,10 @@ function downloadAsDoc(){
     return ' mso-tstyle-colband-size:0;layout-flow:vertical;mso-layout-flow-alt:bottom-to-top">Probabilitas</td>';
   });
 
-  // Heat map cell colors: add mso-pattern for Word color preservation
+  // Heat map cell colors: add mso-pattern for Word color preservation (skip if already present)
   c = c.replace(/(<td[^>]*style="[^"]*)(background:\s*#[0-9A-Fa-f]{3,8})([^"]*")/gi, function(m, pre, bg, post) {
+    // Skip if mso-pattern already exists in this style
+    if ((pre + bg + post).indexOf('mso-pattern') >= 0) return m;
     var hex = bg.replace(/background\s*:\s*/i, '');
     return pre + bg + ';mso-pattern:auto none;background-color:' + hex + post;
   });
@@ -1036,13 +1038,19 @@ function downloadAsDoc(){
   c = c.replace(/opacity\s*:\s*[^;"']*;?/gi, '');
   c = c.replace(/cursor\s*:\s*pointer\s*;?/gi, '');
   c = c.replace(/-webkit-[^;"':]+:\s*[^;"']*;?/gi, '');
+  c = c.replace(/word-break\s*:\s*break-all\s*;?/gi, 'word-wrap:break-word;');
+  c = c.replace(/overflow-wrap\s*:\s*break-word\s*;?/gi, '');
 
   // ── Step 8: Fix images — fixed dimensions for Word ──
+  // First: fix logo images inside .logo-cell parent
+  c = c.replace(/<td[^>]*class="[^"]*logo-cell[^"]*"[^>]*>\\s*(<img[^>]*>)/gi, function(m, imgTag) {
+    var cleanImg = imgTag.replace(/style="[^"]*"/gi,'').replace(/\\s+width="[^"]*"/gi,'').replace(/\\s+height="[^"]*"/gi,'');
+    return m.replace(imgTag, cleanImg.replace(/<img/i, '<img width="48" height="24" style="width:48pt;height:24pt"'));
+  });
+  // Then: fix remaining images
   c = c.replace(/<img([^>]*)>/gi, function(m, attrs) {
-    // Logo: fix to 24pt height
-    if (attrs.indexOf('logo-cell') >= 0 || m.indexOf('logo') >= 0) {
-      return '<img' + attrs.replace(/style="[^"]*"/gi,'') + ' width="48" height="24" style="width:48pt;height:24pt">';
-    }
+    // Skip already-fixed logo images
+    if (attrs.indexOf('width:48pt') >= 0) return m;
     // Signature images: fix to 50pt
     if (attrs.indexOf('max-height:50px') >= 0 || attrs.indexOf('max-height:50pt') >= 0) {
       return '<img' + attrs.replace(/style="[^"]*"/gi,'') + ' width="80" height="40" style="width:80pt;height:40pt">';
@@ -1053,6 +1061,24 @@ function downloadAsDoc(){
     }
     return m;
   });
+
+  // ── Step 8b: Sanitize user content (rich-text from copy-paste) ──
+  // Remove Angular/framework elements from web copy-paste
+  c = c.replace(/<source-footnote[^>]*>[\\s\\S]*?<\\/source-footnote>/gi, '');
+  c = c.replace(/<sources-carousel-inline[^>]*>[\\s\\S]*?<\\/sources-carousel-inline>/gi, '');
+  c = c.replace(/<source-inline-chip[^>]*>[\\s\\S]*?<\\/source-inline-chip>/gi, '');
+  // Remove data-* and _ng* attributes
+  c = c.replace(/\\s+(data-[a-z][a-z0-9-]*)="[^"]*"/gi, '');
+  c = c.replace(/\\s+(_ng[a-z][a-z0-9-]*)="[^"]*"/gi, '');
+  c = c.replace(/\\s+ng-version="[^"]*"/gi, '');
+  c = c.replace(/\\s+id="p-rc_[^"]*"/gi, '');
+  // Remove empty HTML comments (<!---->)
+  c = c.replace(/<![-]+>/g, '');
+  // Remove broken Google Sans styles
+  c = c.replace(/style="Google Sans Text[^"]*"/gi, '');
+  // Remove empty <span> and <sup> tags
+  c = c.replace(/<sup[^>]*>\\s*<\\/sup>/gi, '');
+  c = c.replace(/<span[^>]*>\\s*<\\/span>/gi, '');
 
   // Remove editor artifacts
   c = c.replace(/<div[^>]*class="rte-img-toolbar"[^>]*>[\\s\\S]*?<\\/div>/gi, '');
