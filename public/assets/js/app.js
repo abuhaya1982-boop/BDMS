@@ -160,13 +160,19 @@ async function previewDokumenFull(id, mode) {
     let riskMatrixMap = null;
     try { const rmRes = await API.getRiskMatrix(); riskMatrixMap = rmRes.data; } catch(e) { /* fallback to hardcoded */ }
 
-    const html = buildPrintableDoc(d, { unit, probis, owner, gdrivePath, qrSvg, steps, konten, logoB64, riskMatrixMap });
-    const w = window.open('', '_blank');
-    if (!w) { showToast('Pop-up diblokir browser. Izinkan pop-up untuk preview.', 'error'); return; }
-    w.document.write(html);
-    w.document.close();
+    let html = buildPrintableDoc(d, { unit, probis, owner, gdrivePath, qrSvg, steps, konten, logoB64, riskMatrixMap });
+    // Auto-trigger the print dialog only for explicit "pdf" mode, after the document (incl. images) is fully loaded
+    if (mode === 'pdf') {
+      html = html.replace('</body></html>', '<script>window.addEventListener("load",function(){setTimeout(function(){try{window.focus();window.print();}catch(e){}},500);});<\/script></body></html>');
+    }
+    // Open via a real Blob URL (not about:blank + document.write) so the popup has a
+    // concrete document URL/origin — makes window.print() and same-site fetch reliable.
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, '_blank');
+    if (!w) { URL.revokeObjectURL(url); showToast('Pop-up diblokir browser. Izinkan pop-up untuk preview.', 'error'); return; }
     w.focus();
-    if (mode === 'pdf') setTimeout(() => w.print(), 600);
+    setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 60000);
     showToast(`Preview: ${d.nomor_dokumen}`, 'success');
   } catch (e) {
     console.error('previewDokumenFull error:', e);
