@@ -919,7 +919,7 @@ table.step-tbl li{margin-bottom:1px}
   ${screenPage3}
 </div>
 <script>
-function downloadAsDoc(){
+async function downloadAsDoc(){
   // ═══════════════════════════════════════════════════════════════════
   // MSO-Specific Word Export — Linear Structure (No wrapper table)
   // ═══════════════════════════════════════════════════════════════════
@@ -933,23 +933,80 @@ function downloadAsDoc(){
   var printEls = tmp.querySelectorAll('.print-only');
   for(var p=0;p<printEls.length;p++) printEls[p].style.display='block';
 
+  // ── Step 1b: Remove PLN NP company branding from cover page ──
+  var coverComp = tmp.querySelector('.cover-company');
+  if(coverComp) coverComp.parentNode.removeChild(coverComp);
+
+  // ── Step 1c: Center cover metadata table ──
+  var coverMeta = tmp.querySelector('.cover-meta');
+  if(coverMeta){
+    coverMeta.style.cssText = 'width:100%;margin:0 auto 40pt;text-align:center';
+    var metaTbl = coverMeta.querySelector('table');
+    if(metaTbl){
+      metaTbl.setAttribute('align','center');
+      metaTbl.style.cssText = 'font-size:11pt;border-collapse:collapse;margin:0 auto';
+    }
+  }
+
+  // ── Step 1d: Convert SVG QR code to PNG image for Word ──
+  var svgEls = tmp.querySelectorAll('svg');
+  for(var si=0;si<svgEls.length;si++){
+    var svgEl = svgEls[si];
+    try {
+      var svgStr = new XMLSerializer().serializeToString(svgEl);
+      var svgB64 = btoa(unescape(encodeURIComponent(svgStr)));
+      var canvas = document.createElement('canvas');
+      canvas.width = 200; canvas.height = 200;
+      var ctxC = canvas.getContext('2d');
+      var imgTmp = new Image();
+      imgTmp.src = 'data:image/svg+xml;base64,' + svgB64;
+      await new Promise(function(resolve){ imgTmp.onload=resolve; imgTmp.onerror=resolve; });
+      ctxC.fillStyle = '#fff';
+      ctxC.fillRect(0,0,200,200);
+      ctxC.drawImage(imgTmp, 0, 0, 200, 200);
+      var pngUrl = canvas.toDataURL('image/png');
+      var newImg = document.createElement('img');
+      newImg.src = pngUrl;
+      newImg.setAttribute('width','90');
+      newImg.setAttribute('height','90');
+      newImg.style.cssText = 'width:90pt;height:90pt';
+      svgEl.parentNode.replaceChild(newImg, svgEl);
+    } catch(e){ /* fallback: leave SVG as-is, will be stripped by regex later */ }
+  }
+
+  // ── Step 1e: Restructure QR block as Word table (DOM-based) ──
+  var qrBlock = tmp.querySelector('.qr-block');
+  if(qrBlock){
+    var qrTable = document.createElement('table');
+    qrTable.style.cssText = 'width:100%;border:1.5pt solid #000;border-collapse:collapse;margin:14pt 0;mso-table-lspace:0;mso-table-rspace:0;mso-pagination:lines-together;page-break-inside:avoid';
+    var qrTr = document.createElement('tr');
+    // QR code image cell
+    var tdQr = document.createElement('td');
+    tdQr.style.cssText = 'width:100pt;padding:8pt;border:none;vertical-align:top;text-align:center';
+    var qrImg = qrBlock.querySelector('img');
+    if(qrImg){ tdQr.appendChild(qrImg.cloneNode(true)); }
+    // Text/description cell — preserve actual content
+    var tdTxt = document.createElement('td');
+    tdTxt.style.cssText = 'padding:8pt;border:none;vertical-align:top;font-size:9pt;color:#333';
+    var qrText = qrBlock.querySelector('.qr-text');
+    if(qrText){ tdTxt.innerHTML = qrText.innerHTML; }
+    qrTr.appendChild(tdQr);
+    qrTr.appendChild(tdTxt);
+    qrTable.appendChild(qrTr);
+    qrBlock.parentNode.replaceChild(qrTable, qrBlock);
+  }
+
   // ── Step 2: Extract content-wrap-table → LINEAR structure ──
   // This is CRITICAL: Word cannot handle all body content inside a single <td>
-  // Extract the ik-header from <thead>, body from <tbody>, footer from <tfoot>
-  // and place them as siblings in the document flow
   var wrapTable = tmp.querySelector('.content-wrap-table');
   if(wrapTable){
     var parentEl = wrapTable.parentElement;
-    // Extract header HTML (ik-header table)
     var theadCell = wrapTable.querySelector('.content-thead-cell');
     var hdrHtml = theadCell ? theadCell.innerHTML : '';
-    // Extract body content
     var tbodyCell = wrapTable.querySelector('.content-tbody-cell');
     var bodyHtml = tbodyCell ? tbodyCell.innerHTML : '';
-    // Extract footer
     var tfootCell = wrapTable.querySelector('.content-tfoot-cell');
     var ftrHtml = tfootCell ? tfootCell.innerHTML : '';
-    // Replace the table with linear content
     var linearDiv = document.createElement('div');
     linearDiv.className = 'content-page';
     linearDiv.innerHTML = hdrHtml + bodyHtml + ftrHtml;
@@ -958,36 +1015,9 @@ function downloadAsDoc(){
 
   var c = tmp.innerHTML;
 
-  // ── Step 3: SVG → Word-safe placeholder ──
+  // ── Step 3: Remove any remaining SVGs (fallback) ──
   c = c.replace(/<svg[^>]*>[\\s\\S]*?<\\/svg>/gi,
-    '<table style="width:90pt;border:2pt solid #000;border-collapse:collapse;mso-table-lspace:0;mso-table-rspace:0">' +
-    '<tr><td style="width:90pt;height:90pt;text-align:center;vertical-align:middle;padding:6pt;border:none;font-size:9pt;font-weight:bold;color:#333">' +
-    '[QR Code]<br><span style="font-size:7pt;font-weight:normal;color:#666">Scan di versi digital</span>' +
-    '</td></tr></table>');
-
-  // ── Step 4: Convert flex-based QR block to Word table ──
-  c = c.replace(/<div class="qr-block"[^>]*>([\\s\\S]*?)<\\/div>\\s*<div class="footer-line">/gi, function(m, inner) {
-    // Extract text parts from the QR block
-    var qrBox = inner;
-    return '<table style="width:100%;border:1.5pt solid #000;border-collapse:collapse;margin:14pt 0;mso-table-lspace:0;mso-table-rspace:0;mso-pagination:lines-together;page-break-inside:avoid">' +
-      '<tr>' +
-      '<td style="width:100pt;padding:8pt;border:none;vertical-align:top;text-align:center">' +
-      '<table style="width:90pt;border:2pt solid #000;border-collapse:collapse"><tr><td style="width:90pt;height:90pt;text-align:center;vertical-align:middle;padding:6pt;border:none;font-size:9pt;font-weight:bold;color:#333">[QR Code]<br><span style="font-size:7pt;font-weight:normal;color:#666">Scan di versi digital</span></td></tr></table>' +
-      '</td>' +
-      '<td style="padding:8pt;border:none;vertical-align:top;font-size:8.5pt;color:#333">' +
-      '<p style="margin:0 0 4pt;font-size:10pt;font-weight:bold">QR Code Akses Dokumen</p>' +
-      '<p style="margin:0 0 6pt;font-size:9pt">Scan kode QR untuk mengakses dokumen instruksi kerja di lapangan.</p>' +
-      '</td>' +
-      '</tr></table>' +
-      '<div class="footer-line">';
-  });
-
-  // Fallback: if QR block regex didn't match (no footer after it), convert remaining qr-blocks
-  c = c.replace(/<div class="qr-block"[^>]*>[\\s\\S]*?<\\/div>\\s*<\\/div>\\s*<\\/div>/gi,
-    '<table style="width:100%;border:1.5pt solid #000;border-collapse:collapse;margin:14pt 0;mso-table-lspace:0;mso-table-rspace:0;mso-pagination:lines-together;page-break-inside:avoid">' +
-    '<tr><td style="padding:8pt;border:none;vertical-align:top;text-align:center">' +
-    '<table style="width:90pt;border:2pt solid #000;border-collapse:collapse"><tr><td style="width:90pt;height:90pt;text-align:center;vertical-align:middle;padding:6pt;border:none;font-size:9pt;font-weight:bold;color:#333">[QR Code]</td></tr></table>' +
-    '</td></tr></table>');
+    '<table style="width:90pt;border:2pt solid #000;border-collapse:collapse"><tr><td style="width:90pt;height:90pt;text-align:center;vertical-align:middle;padding:6pt;border:none;font-size:9pt;font-weight:bold;color:#333">[QR Code]</td></tr></table>');
 
   // ── Step 5: Footer-line → Word table layout ──
   c = c.replace(/<div class="footer-line">([\\s\\S]*?)<\\/div>/gi, function(m, inner) {
@@ -1040,6 +1070,12 @@ function downloadAsDoc(){
   c = c.replace(/-webkit-[^;"':]+:\s*[^;"']*;?/gi, '');
   c = c.replace(/word-break\s*:\s*break-all\s*;?/gi, 'word-wrap:break-word;');
   c = c.replace(/overflow-wrap\s*:\s*break-word\s*;?/gi, '');
+
+  // ── Step 7b: Fix heat map risk markers for Word ──
+  // Word ignores display:inline-block with explicit width/height on spans.
+  // Convert to simple bordered spans with padding that Word renders correctly.
+  c = c.replace(/display:inline-block;width:14pt;height:14pt;/g, '');
+  c = c.replace(/line-height:14pt;/g, 'padding:1pt 4pt;');
 
   // ── Step 8: Fix images — fixed dimensions for Word ──
   // First: fix logo images inside .logo-cell parent
@@ -1123,9 +1159,9 @@ function downloadAsDoc(){
     '.cover-company{font-size:14pt;font-weight:bold;color:#0066B3;margin-bottom:40pt}' +
     '.cover-title-box{border:2pt solid #000;padding:15pt 30pt;margin:0 auto 40pt;text-align:center;mso-element:para-border-div}' +
     '.cover-title{font-size:16pt;font-weight:bold;line-height:1.3}' +
-    '.cover-meta{width:70%;margin:0 auto 40pt;text-align:left}' +
-    '.cover-meta table{width:100%;font-size:11pt;border-collapse:collapse}' +
-    '.cover-meta td{padding:4pt 4pt;vertical-align:top;border:none}' +
+    '.cover-meta{width:100%;margin:0 auto 40pt;text-align:center}' +
+    '.cover-meta table{font-size:11pt;border-collapse:collapse;margin:0 auto}' +
+    '.cover-meta td{padding:4pt 4pt;vertical-align:top;border:none;text-align:left}' +
     /* ── Signature table ── */
     '.sig-table{width:100%;border-collapse:collapse;margin-top:30pt;mso-pagination:lines-together}' +
     '.sig-table td{border:1pt solid #999;padding:6pt 8pt;text-align:center;font-size:9pt;vertical-align:top;mso-pattern:auto none;background-color:#f0f0f0}' +
