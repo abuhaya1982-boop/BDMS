@@ -15,7 +15,7 @@ const {
 const A4_W = 11906, A4_H = 16838;
 const MARGIN = { top: 850, right: 567, bottom: 850, left: 1134 }; // T:1.5cm R:1cm B:1.5cm L:2cm
 const CONTENT_W = A4_W - MARGIN.left - MARGIN.right; // 10205 DXA
-const FONT = 'Arial';
+const FONT = 'Courier New';
 const SZ = { xs: 14, sm: 16, md: 20, lg: 22, xl: 28, xxl: 36, title: 44, cover: 56 }; // half-points
 const CLR = { primary: '2A7489', dark: '000000', gray: '808080', headerBg: 'D9E2F3', white: 'FFFFFF' };
 

@@ -127,7 +127,7 @@ function renderIKRows(docs, cols) {
     const cells = cols.map(k => {
       switch (k) {
         case 'nomor_dokumen': return `<td class="td-mono">${esc(d.nomor_dokumen)}</td>`;
-        case 'judul': return `<td style="max-width:200px"><div title="${esc(d.judul)}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">${esc(d.judul)}</div></td>`;
+        case 'judul': return `<td style="max-width:200px"><div title="${esc(d.judul)}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;text-transform:uppercase;font-weight:600">${esc(d.judul)}</div></td>`;
         case 'unit_nama': return `<td style="font-size:11.5px">${esc(d.unit_nama || '')}</td>`;
         case 'revisi': return `<td style="text-align:center"><span class="badge badge-blue" style="font-size:10px">Rev ${d.revisi || '00'}</span></td>`;
         case 'status': return `<td>${statusBadge(d.status)}</td>`;

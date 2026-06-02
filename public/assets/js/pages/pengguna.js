@@ -29,10 +29,15 @@ async function renderUserList() {
         <div class="page-title">Manajemen Pengguna & Akses</div>
         <div class="page-subtitle">${users.length} dari ${allUsers.length} pengguna</div>
       </div>
-      <div class="page-actions" style="gap:4px">
-        <button class="btn btn-secondary btn-sm" onclick="exportUsersCSV()">${icon('download', 14)} Export CSV</button>
-        <button class="btn btn-secondary btn-sm" onclick="importUsersCSV()">${icon('upload', 14)} Import CSV</button>
-        <button class="btn btn-secondary btn-sm" onclick="openInviteModal()">${icon('mail', 14)} Undang</button>
+      <div class="page-actions" style="gap:4px;flex-wrap:wrap">
+        <div class="btn-group-dropdown" style="position:relative;display:inline-block">
+          <button class="btn btn-secondary btn-sm" onclick="toggleUserMenu(this)">${icon('more-horizontal', 14)} Lainnya ▾</button>
+          <div class="usr-dropdown-menu" style="display:none;position:absolute;right:0;top:100%;margin-top:4px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:50;min-width:160px;padding:4px 0">
+            <button class="usr-dropdown-item" onclick="exportUsersCSV();closeUserMenu()" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;color:var(--text-primary);text-align:left" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='none'">${icon('download', 14)} Export CSV</button>
+            <button class="usr-dropdown-item" onclick="importUsersCSV();closeUserMenu()" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;color:var(--text-primary);text-align:left" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='none'">${icon('upload', 14)} Import CSV</button>
+            <button class="usr-dropdown-item" onclick="openInviteModal();closeUserMenu()" style="display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;border:none;background:none;cursor:pointer;font-size:12px;color:var(--text-primary);text-align:left" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='none'">${icon('mail', 14)} Undang</button>
+          </div>
+        </div>
         <button class="btn btn-danger btn-sm" id="bulkDeleteBtn" style="display:none" onclick="bulkDeleteUsers()">${icon('trash-2', 14)} Hapus Terpilih</button>
         <button class="btn btn-primary btn-sm" onclick="openAddUserModal()">${icon('plus', 14)} Tambah</button>
       </div>
@@ -58,7 +63,7 @@ async function renderUserList() {
     <div class="card">
       <div class="table-container">
         <table>
-          <thead><tr><th style="width:32px"></th><th>Nama</th><th>NID</th><th>Unit</th><th>Jabatan</th><th>Role</th><th>Auth</th><th>Status</th><th>Login Terakhir</th><th style="min-width:150px">Aksi</th></tr></thead>
+          <thead><tr><th style="width:32px"></th><th>Nama</th><th>NID</th><th>Unit</th><th>Jabatan</th><th>Role</th><th>Auth</th><th>Status</th><th>Login Terakhir</th><th style="min-width:80px">Aksi</th></tr></thead>
           <tbody>
             ${users.map(u => `
               <tr id="usr-row-${u.id}">
@@ -82,14 +87,20 @@ async function renderUserList() {
                 </td>
                 <td style="font-size:11.5px;color:var(--text-tertiary)">${formatDate(u.last_login)}</td>
                 <td>
-                  <div style="display:flex;gap:3px">
+                  <div style="display:flex;gap:3px;align-items:center">
                     <button class="btn btn-secondary btn-xs" onclick="editUser(${u.id})" title="Edit">${icon('edit-3', 13)}</button>
-                    <button class="btn btn-secondary btn-xs" onclick="adminForceReset(${u.id})" title="Force reset password">${icon('key', 13)}</button>
-                    ${u.status === 'Aktif'
-                      ? `<button class="btn btn-secondary btn-xs" onclick="suspendUser(${u.id})" title="Suspend">${icon('pause-circle', 13)}</button>`
-                      : `<button class="btn btn-secondary btn-xs" onclick="activateUser(${u.id})" title="Aktifkan">${icon('play-circle', 13)}</button>`}
-                    <button class="btn btn-secondary btn-xs" onclick="API.getSessions(${u.id}).then(r => showUserSessions(${u.id}, r.data))" title="Sesi aktif">${icon('smartphone', 13)}</button>
-                    <button class="btn btn-danger btn-xs" onclick="deleteUser(${u.id})" title="Hapus">${icon('trash-2', 13)}</button>
+                    <div style="position:relative;display:inline-block">
+                      <button class="btn btn-secondary btn-xs" onclick="toggleRowMenu(this,${u.id})" title="Aksi lainnya">${icon('more-vertical', 13)}</button>
+                      <div class="usr-row-menu" style="display:none;position:absolute;right:0;top:100%;margin-top:2px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:50;min-width:155px;padding:4px 0;white-space:nowrap">
+                        <button onclick="adminForceReset(${u.id});closeAllRowMenus()" style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 12px;border:none;background:none;cursor:pointer;font-size:11.5px;color:var(--text-primary);text-align:left" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='none'">${icon('key', 13)} Reset Password</button>
+                        ${u.status === 'Aktif'
+                          ? `<button onclick="suspendUser(${u.id});closeAllRowMenus()" style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 12px;border:none;background:none;cursor:pointer;font-size:11.5px;color:var(--text-primary);text-align:left" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='none'">${icon('pause-circle', 13)} Suspend</button>`
+                          : `<button onclick="activateUser(${u.id});closeAllRowMenus()" style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 12px;border:none;background:none;cursor:pointer;font-size:11.5px;color:var(--text-primary);text-align:left" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='none'">${icon('play-circle', 13)} Aktifkan</button>`}
+                        <button onclick="API.getSessions(${u.id}).then(r=>showUserSessions(${u.id},r.data));closeAllRowMenus()" style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 12px;border:none;background:none;cursor:pointer;font-size:11.5px;color:var(--text-primary);text-align:left" onmouseover="this.style.background='var(--surface-2)'" onmouseout="this.style.background='none'">${icon('smartphone', 13)} Sesi Aktif</button>
+                        <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+                        <button onclick="deleteUser(${u.id});closeAllRowMenus()" style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 12px;border:none;background:none;cursor:pointer;font-size:11.5px;color:var(--danger);text-align:left" onmouseover="this.style.background='#FEF2F2'" onmouseout="this.style.background='none'">${icon('trash-2', 13)} Hapus</button>
+                      </div>
+                    </div>
                   </div>
                 </td>
               </tr>
@@ -574,3 +585,28 @@ async function forceLogoutSession(sessionId) {
     closeModal('modalGeneric');
   } catch (e) { showToast('Gagal: ' + e.message, 'error'); }
 }
+
+// ─── DROPDOWN HELPERS ──────────────────────
+function toggleUserMenu(btn) {
+  const menu = btn.nextElementSibling;
+  const isOpen = menu.style.display !== 'none';
+  closeUserMenu();
+  if (!isOpen) menu.style.display = 'block';
+}
+function closeUserMenu() {
+  document.querySelectorAll('.usr-dropdown-menu').forEach(m => m.style.display = 'none');
+}
+function toggleRowMenu(btn, id) {
+  const menu = btn.nextElementSibling;
+  const isOpen = menu.style.display !== 'none';
+  closeAllRowMenus();
+  if (!isOpen) menu.style.display = 'block';
+}
+function closeAllRowMenus() {
+  document.querySelectorAll('.usr-row-menu').forEach(m => m.style.display = 'none');
+}
+// Close menus on outside click
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.btn-group-dropdown') && !e.target.closest('.usr-dropdown-menu')) closeUserMenu();
+  if (!e.target.closest('.usr-row-menu') && !e.target.closest('[onclick*="toggleRowMenu"]')) closeAllRowMenus();
+});

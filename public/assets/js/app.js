@@ -258,7 +258,7 @@ function buildHeatMapHtml(risiko) {
   });
 
   // Build heat map table — same structure as renderRiskHeatMap() in buat-ik.js
-  let h = `<table style="border-collapse:collapse;width:100%;font-family:'Inter','Plus Jakarta Sans',sans-serif;font-size:10px;table-layout:fixed">`;
+  let h = `<table style="border-collapse:collapse;width:100%;font-family:inherit;font-size:10px;table-layout:fixed">`;
   // Header row — dampak labels
   h += `<tr><td colspan="2" style="border:1px solid #ccc;background:#f5f5f5;text-align:center;font-weight:700;font-size:10px;width:110px"></td>`;
   dampakLabels.forEach(d => { h += `<td style="border:1px solid #ccc;background:#f5f5f5;text-align:center;font-weight:600;padding:4px 2px">${d.label}<br><span style="font-weight:400">${d.val}</span></td>`; });
@@ -323,7 +323,7 @@ function buildPrintableDoc(d, ctx) {
 @page{size:A4;margin:15mm 10mm 15mm 20mm}
 @page:first{size:A4;margin:15mm 10mm 15mm 20mm}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;font-size:10pt;line-height:1.5;color:#1a1a1a;background:#e2e8f0;-webkit-font-smoothing:antialiased}
+body{font-family:'Courier Prime','Courier New',Courier,monospace;font-size:10pt;line-height:1.5;color:#1a1a1a;background:#e2e8f0;-webkit-font-smoothing:antialiased}
 .toolbar{position:fixed;top:0;left:0;right:0;background:#1a1f2e;color:#fff;padding:6px 16px;display:flex;align-items:center;gap:10px;z-index:9999;font-size:12px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
 .toolbar button{background:#2563EB;color:#fff;border:none;padding:5px 12px;border-radius:4px;font-size:11px;cursor:pointer;font-weight:600}
 .toolbar button:hover{background:#1d4ed8}
@@ -333,14 +333,14 @@ body{font-family:Arial,'Helvetica Neue',Helvetica,sans-serif;font-size:10pt;line
 .toolbar .info{font-size:10px;color:#94a3b8;max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* Pages — consistent on screen & print */
-.page-container{max-width:210mm;margin:50px auto 30px}
-.page{padding:15mm 10mm 15mm 20mm;position:relative;min-height:297mm;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.12);margin-bottom:40px}
+.page-container{width:210mm;max-width:210mm;margin:50px auto 30px}
+.page{padding:15mm 10mm 15mm 20mm;position:relative;min-height:297mm;width:210mm;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.12);margin-bottom:40px}
 .page-break{page-break-before:always}
 .page-top{padding-top:15mm}
 .page-number{position:absolute;bottom:10mm;right:15mm;font-size:8pt;color:#666}
 
 /* ── HALAMAN JUDUL (Cover) ── */
-.cover{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:297mm;padding:15mm 10mm 15mm 20mm;text-align:center;page-break-after:always}
+.cover{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:297mm;width:210mm;padding:15mm 10mm 15mm 20mm;text-align:center;page-break-after:always}
 .cover-label{font-size:18pt;font-weight:700;color:#000;letter-spacing:1.5px;margin-bottom:4px}
 .cover-company{font-size:16pt;font-weight:700;color:#2A7489;margin-bottom:30px}
 .cover-title-box{border:2px solid #2A7489;padding:20px 40px;margin-bottom:40px;min-width:80%}
@@ -402,17 +402,18 @@ table.step-tbl li{margin-bottom:1px}
 .print-only{display:none}
 .screen-only{display:block}
 
-/* Screen page structure */
+/* Screen page structure — paginated content pages must be exact A4 */
 .page-hdr{margin-bottom:8px}
 .page-body{flex:1;overflow:hidden}
 .page-ftr{margin-top:auto;padding-top:6px}
+.screen-only .content-page{height:297mm;min-height:297mm;max-height:297mm;display:flex;flex-direction:column;overflow:hidden}
 
 /* Content page wrapper — repeating header & footer on print */
-.content-wrap-table{width:100%;border-collapse:collapse;border:none}
+.content-wrap-table{width:100%;border-collapse:collapse;border:none;table-layout:fixed}
 .content-wrap-table,.content-wrap-table thead,.content-wrap-table tbody,.content-wrap-table tfoot,.content-wrap-table tr,.content-thead-cell,.content-tbody-cell,.content-tfoot-cell{border:none;padding:0;margin:0}
-.content-thead-cell{padding:0 0 8px 0;vertical-align:top}
-.content-tbody-cell{padding:0;vertical-align:top;overflow:hidden;word-wrap:break-word;max-width:100%}
-.content-tfoot-cell{padding:8px 0 0;vertical-align:bottom;font-size:8pt;color:#666;text-align:center;border-top:0.5px solid #ccc}
+.content-thead-cell{padding:0 0 8px 0;vertical-align:top;width:100%}
+.content-tbody-cell{padding:0;vertical-align:top;overflow:hidden;word-wrap:break-word;width:100%}
+.content-tfoot-cell{padding:8px 0 0;vertical-align:bottom;font-size:8pt;color:#666;text-align:center;border-top:0.5px solid #ccc;width:100%}
 
 /* QR */
 .qr-block{display:flex;align-items:flex-start;gap:16px;margin:16px 0;padding:14px;border:1.5px solid #ccc;border-radius:6px;background:#fafafa}
@@ -435,7 +436,7 @@ table.step-tbl li{margin-bottom:1px}
   .page-number{display:none}
   .content-wrap-table thead{display:table-header-group}
   .content-wrap-table tfoot{display:table-footer-group}
-  .content-page{padding:0;min-height:auto}
+  .content-page{padding:0;min-height:auto;height:auto;max-height:none;overflow:visible}
   /* Prevent section titles from being orphaned at bottom of page */
   .sec-title{page-break-after:avoid;page-break-inside:avoid;break-after:avoid}
   .sub-title{page-break-after:avoid;page-break-inside:avoid;break-after:avoid}
@@ -894,7 +895,7 @@ table.step-tbl li{margin-bottom:1px}
   // ── ASSEMBLE FULL DOCUMENT ──
   return `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">
 <title>${nom} &mdash; ${judul}</title>
-<!-- Arial is a system font, no external CSS needed -->
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet">
 <style>${css}</style>
 </head><body>
 <div class="toolbar no-print">
@@ -994,7 +995,7 @@ function downloadAsDoc(){
   var docCss =
     '@page WordSection1{size:210mm 297mm;margin:15mm 10mm 15mm 20mm;mso-header-margin:5mm;mso-footer-margin:5mm}' +
     'div.WordSection1{page:WordSection1}' +
-    'body{font-family:"Courier New",Courier,monospace;font-size:10pt;line-height:1.6;color:#1a1a1a;background:#fff;margin:0;padding:0}' +
+    'body{font-family:"Courier New",Courier,monospace;font-size:10pt;line-height:1.5;color:#1a1a1a;background:#fff;margin:0;padding:0}' +
     'table{border-collapse:collapse;mso-table-lspace:0;mso-table-rspace:0}' +
     'td,th{mso-line-height-rule:exactly}' +
     '.toolbar,.no-print{display:none!important}' +
@@ -1073,20 +1074,44 @@ document.addEventListener('DOMContentLoaded', function(){
   var wrap = document.getElementById('screen-content-pages');
   if(!src || !wrap) return;
 
-  // A4 body height in px: 297mm - 15mm top - 15mm bottom = 267mm for full page
-  // But we also have header (~40px) + footer (~30px), so usable body ≈ 267mm - header - footer
-  // Convert mm to px at 96dpi: 1mm ≈ 3.7795px
-  var MM = 3.7795;
-  var PAGE_H = 267 * MM;        // 267mm in px (≈1009px)
-  var HDR_H  = 65;               // approximate header table height in px
-  var FTR_H  = 30;               // approximate footer height in px
-  var BODY_H = PAGE_H - HDR_H - FTR_H - 24; // usable body per page (~890px)
-
   // Get header and footer HTML from the first page
   var firstPage = wrap.querySelector('.content-page');
   if(!firstPage) return;
-  var hdrHtml = firstPage.querySelector('.page-hdr') ? firstPage.querySelector('.page-hdr').outerHTML : '';
-  var ftrHtml = firstPage.querySelector('.page-ftr') ? firstPage.querySelector('.page-ftr').outerHTML : '';
+  var hdrEl = firstPage.querySelector('.page-hdr');
+  var ftrEl = firstPage.querySelector('.page-ftr');
+  var hdrHtml = hdrEl ? hdrEl.outerHTML : '';
+  var ftrHtml = ftrEl ? ftrEl.outerHTML : '';
+
+  // ── DYNAMIC measurement: measure actual header/footer heights ──
+  // Create a hidden measuring page with identical styling
+  var measurePage = document.createElement('div');
+  measurePage.className = 'page page-break page-top content-page';
+  measurePage.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;height:297mm;width:210mm;display:flex;flex-direction:column;overflow:hidden;padding:15mm 10mm 15mm 20mm;box-sizing:border-box';
+  measurePage.innerHTML = hdrHtml + '<div class="page-body" style="flex:1;overflow:hidden"></div>' + ftrHtml;
+  document.body.appendChild(measurePage);
+
+  // Measure actual rendered heights
+  var mHdr = measurePage.querySelector('.page-hdr');
+  var mFtr = measurePage.querySelector('.page-ftr');
+  var mBody = measurePage.querySelector('.page-body');
+  var HDR_H = mHdr ? mHdr.getBoundingClientRect().height : 70;
+  var FTR_H = mFtr ? mFtr.getBoundingClientRect().height : 30;
+
+  // A4 content area = 297mm - 15mm(top padding) - 15mm(bottom padding) = 267mm
+  // Convert: 1mm at 96dpi = 3.7795px
+  var CONTENT_H = 267 * 3.7795; // ≈1009px
+  // Usable body = content area - header - header margin-bottom(8px) - footer - footer padding-top(6px) - safety(12px)
+  var BODY_H = CONTENT_H - HDR_H - 8 - FTR_H - 6 - 12;
+  document.body.removeChild(measurePage);
+
+  // Helper: get full element height including margins
+  function fullHeight(el){
+    var style = window.getComputedStyle(el);
+    var h = el.getBoundingClientRect().height;
+    h += parseFloat(style.marginTop) || 0;
+    h += parseFloat(style.marginBottom) || 0;
+    return h;
+  }
 
   // Collect all direct children of the source body
   var children = Array.prototype.slice.call(src.children);
@@ -1115,10 +1140,10 @@ document.addEventListener('DOMContentLoaded', function(){
   for(var i=0; i<children.length; i++){
     var el = children[i];
     var clone = el.cloneNode(true);
-    // Temporarily add to DOM to measure
+    // Temporarily add to DOM to measure (inside correct layout context)
     currentBody.appendChild(clone);
     src.appendChild(currentBody);
-    var elH = clone.offsetHeight || 0;
+    var elH = fullHeight(clone);
     src.removeChild(currentBody);
 
     if(currentH > 0 && (currentH + elH) > BODY_H){
