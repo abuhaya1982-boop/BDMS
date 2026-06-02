@@ -257,44 +257,50 @@ function buildHeatMapHtml(risiko) {
     }
   });
 
-  // Build heat map table — same structure as renderRiskHeatMap() in buat-ik.js
-  let h = `<table style="border-collapse:collapse;width:100%;font-family:inherit;font-size:10px;table-layout:fixed">`;
+  // Build heat map table — Word-compatible (no flex, no writing-mode, absolute widths in pt)
+  // Total table width ≈ 480pt (fits within A4 content area 180mm ≈ 510pt, with margin)
+  const hmCellW = '68pt';   // each of 5 dampak columns
+  const hmLabelW = '18pt';  // Probabilitas vertical column
+  const hmProbW = '65pt';   // probability label column
+  let h = `<table style="border-collapse:collapse;width:100%;font-family:inherit;font-size:10px;table-layout:fixed;mso-table-lspace:0pt;mso-table-rspace:0pt">`;
   // Header row — dampak labels
-  h += `<tr><td colspan="2" style="border:1px solid #ccc;background:#f5f5f5;text-align:center;font-weight:700;font-size:10px;width:110px"></td>`;
-  dampakLabels.forEach(d => { h += `<td style="border:1px solid #ccc;background:#f5f5f5;text-align:center;font-weight:600;padding:4px 2px">${d.label}<br><span style="font-weight:400">${d.val}</span></td>`; });
+  h += `<tr><td colspan="2" style="border:1px solid #ccc;background:#f5f5f5;mso-pattern:auto none;background-color:#f5f5f5;text-align:center;font-weight:700;font-size:10px;width:${hmProbW}"></td>`;
+  dampakLabels.forEach(d => { h += `<td style="border:1px solid #ccc;background:#f5f5f5;mso-pattern:auto none;background-color:#f5f5f5;text-align:center;font-weight:600;padding:4px 2px;width:${hmCellW}">${d.label}<br><span style="font-weight:400">${d.val}</span></td>`; });
   h += `</tr>`;
   // Probability rows (E=5 down to A=1)
   probLabels.forEach((p, i) => {
     h += `<tr>`;
-    if (i === 0) h += `<td rowspan="5" style="border:1px solid #ccc;background:#f5f5f5;text-align:center;font-weight:700;writing-mode:vertical-lr;transform:rotate(180deg);padding:6px 2px;font-size:11px;width:24px">Probabilitas</td>`;
-    h += `<td style="border:1px solid #ccc;background:#f5f5f5;text-align:center;font-weight:600;padding:3px;line-height:1.2;width:86px">${p.label}<br><b>${p.key}</b></td>`;
+    if (i === 0) h += `<td rowspan="5" style="border:1px solid #ccc;background:#f5f5f5;mso-pattern:auto none;background-color:#f5f5f5;text-align:center;font-weight:700;padding:6px 2px;font-size:11px;width:${hmLabelW};mso-text-orientation:upward">P<br>R<br>O<br>B</td>`;
+    h += `<td style="border:1px solid #ccc;background:#f5f5f5;mso-pattern:auto none;background-color:#f5f5f5;text-align:center;font-weight:600;padding:3px;line-height:1.2;width:${hmProbW}">${p.label}<br><b>${p.key}</b></td>`;
     dampakLabels.forEach(d => {
       const c = rmGet(p.val, d.val);
       const key = `${p.val}-${d.val}`;
-      // Build markers
+      // Build markers — use inline-block for Word compatibility
       let markers = '';
       if (inherentMap[key]) {
-        markers += inherentMap[key].map(n => `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border:2px solid #333;border-radius:3px;background:#fff;font-size:9px;font-weight:700;color:#333">${n}</span>`).join('');
+        markers += inherentMap[key].map(n => `<span style="display:inline-block;width:14pt;height:14pt;border:2px solid #333;text-align:center;line-height:14pt;background:#fff;font-size:9px;font-weight:700;color:#333;margin:1px">${n}</span>`).join('');
       }
       if (residualMap[key]) {
-        markers += residualMap[key].map(n => `<span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border:2px solid #C2410C;border-radius:3px;background:#FB923C;font-size:9px;font-weight:700;color:#fff">${n}</span>`).join('');
+        markers += residualMap[key].map(n => `<span style="display:inline-block;width:14pt;height:14pt;border:2px solid #C2410C;text-align:center;line-height:14pt;background:#FB923C;mso-pattern:auto none;background-color:#FB923C;font-size:9px;font-weight:700;color:#fff;margin:1px">${n}</span>`).join('');
       }
-      h += `<td style="border:1px solid #999;background:${c.color};text-align:center;padding:4px 2px;vertical-align:middle">
-        <div style="font-weight:600;font-size:8px;color:#333;opacity:0.7">${c.level}</div>
+      h += `<td style="border:1px solid #999;background:${c.color};mso-pattern:auto none;background-color:${c.color};text-align:center;padding:4px 2px;vertical-align:middle;width:${hmCellW}">
+        <div style="font-weight:600;font-size:8px;color:#333">${c.level}</div>
         <div style="font-weight:800;font-size:13px;color:#222">${c.score}</div>
-        <div style="display:flex;gap:2px;justify-content:center;flex-wrap:wrap;margin-top:1px">${markers}</div>
+        <div style="text-align:center;margin-top:1px">${markers}</div>
       </td>`;
     });
     h += `</tr>`;
   });
-  h += `<tr><td colspan="2" style="border:none"></td><td colspan="5" style="border:1px solid #ccc;background:#f5f5f5;text-align:center;font-weight:700;font-size:11px;padding:4px">Dampak</td></tr>`;
+  h += `<tr><td colspan="2" style="border:none"></td><td colspan="5" style="border:1px solid #ccc;background:#f5f5f5;mso-pattern:auto none;background-color:#f5f5f5;text-align:center;font-weight:700;font-size:11px;padding:4px">Dampak</td></tr>`;
   h += `</table>`;
 
-  // Legend
-  h += `<div style="display:flex;gap:16px;margin:8px 0 12px;font-size:10px;flex-wrap:wrap;align-items:center">
-    <span style="display:inline-flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border:2px solid #333;border-radius:3px;background:#fff;font-size:9px;font-weight:700;color:#333">n</span> Inherent Risk</span>
-    <span style="display:inline-flex;align-items:center;gap:4px"><span style="display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border:2px solid #C2410C;border-radius:3px;background:#FB923C;font-size:9px;font-weight:700;color:#fff">n</span> Target Residual Risk</span>
-  </div>`;
+  // Legend — Word-compatible (no flex, use table for alignment)
+  h += `<table style="border-collapse:collapse;margin:8px 0 12px;font-size:10px;border:none;mso-table-lspace:0pt;mso-table-rspace:0pt"><tr>
+    <td style="border:none;padding:2pt 4pt;vertical-align:middle"><span style="display:inline-block;width:14pt;height:14pt;border:2px solid #333;text-align:center;line-height:14pt;background:#fff;font-size:9px;font-weight:700;color:#333">n</span></td>
+    <td style="border:none;padding:2pt 8pt 2pt 2pt;vertical-align:middle;font-size:10px">Inherent Risk</td>
+    <td style="border:none;padding:2pt 4pt;vertical-align:middle"><span style="display:inline-block;width:14pt;height:14pt;border:2px solid #C2410C;text-align:center;line-height:14pt;background:#FB923C;mso-pattern:auto none;background-color:#FB923C;font-size:9px;font-weight:700;color:#fff">n</span></td>
+    <td style="border:none;padding:2pt 4pt 2pt 2pt;vertical-align:middle;font-size:10px">Target Residual Risk</td>
+  </tr></table>`;
 
   return h;
 }
@@ -914,55 +920,80 @@ table.step-tbl li{margin-bottom:1px}
 </div>
 <script>
 function downloadAsDoc(){
-  // ── Clone page-container, remove screen-only, show print-only ──
+  // ═══════════════════════════════════════════════════════════════════
+  // MSO-Specific Word Export — Linear Structure (No wrapper table)
+  // ═══════════════════════════════════════════════════════════════════
+
+  // ── Step 1: Clone and extract content ──
   var tmp = document.querySelector('.page-container').cloneNode(true);
+  // Remove screen-only elements (JS-paginated pages)
   var screenEls = tmp.querySelectorAll('.screen-only');
   for(var s=0;s<screenEls.length;s++) screenEls[s].parentNode.removeChild(screenEls[s]);
+  // Show print-only elements
   var printEls = tmp.querySelectorAll('.print-only');
   for(var p=0;p<printEls.length;p++) printEls[p].style.display='block';
+
+  // ── Step 2: Extract content-wrap-table → LINEAR structure ──
+  // This is CRITICAL: Word cannot handle all body content inside a single <td>
+  // Extract the ik-header from <thead>, body from <tbody>, footer from <tfoot>
+  // and place them as siblings in the document flow
+  var wrapTable = tmp.querySelector('.content-wrap-table');
+  if(wrapTable){
+    var parentEl = wrapTable.parentElement;
+    // Extract header HTML (ik-header table)
+    var theadCell = wrapTable.querySelector('.content-thead-cell');
+    var hdrHtml = theadCell ? theadCell.innerHTML : '';
+    // Extract body content
+    var tbodyCell = wrapTable.querySelector('.content-tbody-cell');
+    var bodyHtml = tbodyCell ? tbodyCell.innerHTML : '';
+    // Extract footer
+    var tfootCell = wrapTable.querySelector('.content-tfoot-cell');
+    var ftrHtml = tfootCell ? tfootCell.innerHTML : '';
+    // Replace the table with linear content
+    var linearDiv = document.createElement('div');
+    linearDiv.className = 'content-page';
+    linearDiv.innerHTML = hdrHtml + bodyHtml + ftrHtml;
+    parentEl.replaceChild(linearDiv, wrapTable);
+  }
+
   var c = tmp.innerHTML;
 
-  // ── Clean up HTML for Word compatibility ──
-  // Remove SVG (QR code) — convert to descriptive text box for Word
-  c = c.replace(/<svg[^>]*>[\\s\\S]*?<\\/svg>/gi, '<div style="width:120pt;height:120pt;border:2pt solid #000;text-align:center;padding:30pt 10pt;font-size:9pt;font-weight:bold;color:#333;display:inline-block">[QR Code]<br><span style="font-size:7pt;font-weight:normal;color:#666">Scan di versi digital</span></div>');
-  // Remove CSS properties Word doesn't support
-  c = c.replace(/display\\s*:\\s*(flex|grid|inline-flex|inline-grid)[^;"']*/gi, '');
-  c = c.replace(/flex[\\w-]*\\s*:[^;"']*/gi, '');
-  c = c.replace(/gap\\s*:\\s*[^;"']*/gi, '');
-  c = c.replace(/align-items\\s*:[^;"']*/gi, '');
-  c = c.replace(/justify-content\\s*:[^;"']*/gi, '');
-  c = c.replace(/align-self\\s*:[^;"']*/gi, '');
-  c = c.replace(/grid[\\w-]*\\s*:[^;"']*/gi, '');
-  c = c.replace(/border-radius\\s*:[^;"']*/gi, '');
-  c = c.replace(/box-shadow\\s*:[^;"']*/gi, '');
-  c = c.replace(/transition\\s*:[^;"']*/gi, '');
-  c = c.replace(/transform\\s*:[^;"']*/gi, '');
-  c = c.replace(/outline-offset\\s*:[^;"']*/gi, '');
-  c = c.replace(/cursor\\s*:\\s*pointer[^;"']*/gi, '');
-  // Sanitize MSO Word-pasted content styles
-  c = c.replace(/mso-[^;"':]+:[^;"']+;?/gi, '');
-  c = c.replace(/tab-stops\\s*:[^;"']*/gi, '');
-  // Clean empty style attrs
-  c = c.replace(/style="[\\s;]*"/gi, '');
-  // Remove image toolbar artifacts
-  c = c.replace(/<div[^>]*class="rte-img-toolbar"[^>]*>[\\s\\S]*?<\\/div>/gi, '');
-  // Remove inline image outlines (editor artifacts)
-  c = c.replace(/outline\\s*:[^;"']*/gi, '');
-  c = c.replace(/outline-offset\\s*:[^;"']*/gi, '');
+  // ── Step 3: SVG → Word-safe placeholder ──
+  c = c.replace(/<svg[^>]*>[\\s\\S]*?<\\/svg>/gi,
+    '<table style="width:90pt;border:2pt solid #000;border-collapse:collapse;mso-table-lspace:0;mso-table-rspace:0">' +
+    '<tr><td style="width:90pt;height:90pt;text-align:center;vertical-align:middle;padding:6pt;border:none;font-size:9pt;font-weight:bold;color:#333">' +
+    '[QR Code]<br><span style="font-size:7pt;font-weight:normal;color:#666">Scan di versi digital</span>' +
+    '</td></tr></table>');
 
-  // ── Convert flex-based QR block to Word-compatible table layout ──
-  c = c.replace(/<div class="qr-block"[^>]*>([\\s\\S]*?)<\\/div>\\s*<\\/div>\\s*<\\/div>/gi, function(m, inner) {
-    return '<table class="qr-block" style="width:100%;border:1.5pt solid #000;border-collapse:collapse;margin:14pt 0"><tr>' +
-      '<td style="width:130pt;padding:10pt;border:none;vertical-align:top;text-align:center">' +
-      inner.replace(/<div[^>]*style="[^"]*flex-shrink[^"]*"[^>]*>([\\s\\S]*?)<\\/div>/i, '$1') +
-      '</td></tr></table>';
+  // ── Step 4: Convert flex-based QR block to Word table ──
+  c = c.replace(/<div class="qr-block"[^>]*>([\\s\\S]*?)<\\/div>\\s*<div class="footer-line">/gi, function(m, inner) {
+    // Extract text parts from the QR block
+    var qrBox = inner;
+    return '<table style="width:100%;border:1.5pt solid #000;border-collapse:collapse;margin:14pt 0;mso-table-lspace:0;mso-table-rspace:0;mso-pagination:lines-together;page-break-inside:avoid">' +
+      '<tr>' +
+      '<td style="width:100pt;padding:8pt;border:none;vertical-align:top;text-align:center">' +
+      '<table style="width:90pt;border:2pt solid #000;border-collapse:collapse"><tr><td style="width:90pt;height:90pt;text-align:center;vertical-align:middle;padding:6pt;border:none;font-size:9pt;font-weight:bold;color:#333">[QR Code]<br><span style="font-size:7pt;font-weight:normal;color:#666">Scan di versi digital</span></td></tr></table>' +
+      '</td>' +
+      '<td style="padding:8pt;border:none;vertical-align:top;font-size:8.5pt;color:#333">' +
+      '<p style="margin:0 0 4pt;font-size:10pt;font-weight:bold">QR Code Akses Dokumen</p>' +
+      '<p style="margin:0 0 6pt;font-size:9pt">Scan kode QR untuk mengakses dokumen instruksi kerja di lapangan.</p>' +
+      '</td>' +
+      '</tr></table>' +
+      '<div class="footer-line">';
   });
 
-  // Fix footer-line: convert flex layout to table for Word
+  // Fallback: if QR block regex didn't match (no footer after it), convert remaining qr-blocks
+  c = c.replace(/<div class="qr-block"[^>]*>[\\s\\S]*?<\\/div>\\s*<\\/div>\\s*<\\/div>/gi,
+    '<table style="width:100%;border:1.5pt solid #000;border-collapse:collapse;margin:14pt 0;mso-table-lspace:0;mso-table-rspace:0;mso-pagination:lines-together;page-break-inside:avoid">' +
+    '<tr><td style="padding:8pt;border:none;vertical-align:top;text-align:center">' +
+    '<table style="width:90pt;border:2pt solid #000;border-collapse:collapse"><tr><td style="width:90pt;height:90pt;text-align:center;vertical-align:middle;padding:6pt;border:none;font-size:9pt;font-weight:bold;color:#333">[QR Code]</td></tr></table>' +
+    '</td></tr></table>');
+
+  // ── Step 5: Footer-line → Word table layout ──
   c = c.replace(/<div class="footer-line">([\\s\\S]*?)<\\/div>/gi, function(m, inner) {
     var spans = inner.match(/<span[^>]*>[\\s\\S]*?<\\/span>/gi) || [];
     if (spans.length >= 2) {
-      return '<table style="width:100%;border-top:1pt solid #ccc;margin-top:20pt;border-collapse:collapse"><tr>' +
+      return '<table style="width:100%;border-top:1pt solid #ccc;margin-top:16pt;border-collapse:collapse;mso-table-lspace:0;mso-table-rspace:0"><tr>' +
         '<td style="padding-top:6pt;font-size:7.5pt;color:#888;border:none;text-align:left">' + spans[0].replace(/<\\/?span[^>]*>/gi,'') + '</td>' +
         '<td style="padding-top:6pt;font-size:7.5pt;color:#888;border:none;text-align:right">' + spans[1].replace(/<\\/?span[^>]*>/gi,'') + '</td>' +
         '</tr></table>';
@@ -970,18 +1001,69 @@ function downloadAsDoc(){
     return m;
   });
 
-  // ── Fix cover-meta: convert flex centering to Word margin centering ──
-  c = c.replace(/<div class="cover-meta">/gi, '<div class="cover-meta" style="width:70%;margin:0 auto 40pt;text-align:left">');
+  // ── Step 6: Heat Map — fix vertical text & flex layouts for Word ──
+  // Replace writing-mode:vertical-lr;transform:rotate(180deg) with Word-compatible vertical text
+  c = c.replace(/writing-mode\s*:\s*vertical-lr\s*;?\s*/gi, '');
+  c = c.replace(/transform\s*:\s*rotate\([^)]*\)\s*;?\s*/gi, '');
+  // Replace the Probabilitas vertical cell with Word MSO layout-flow
+  c = c.replace(/>Probabilitas<\\/td>/gi, function(m) {
+    return ' mso-tstyle-colband-size:0;layout-flow:vertical;mso-layout-flow-alt:bottom-to-top">Probabilitas</td>';
+  });
 
-  // ── Fix images: ensure all images have proper Word sizing ──
+  // Heat map cell colors: add mso-pattern for Word color preservation
+  c = c.replace(/(<td[^>]*style="[^"]*)(background:\s*#[0-9A-Fa-f]{3,8})([^"]*")/gi, function(m, pre, bg, post) {
+    var hex = bg.replace(/background\s*:\s*/i, '');
+    return pre + bg + ';mso-pattern:auto none;background-color:' + hex + post;
+  });
+
+  // Heat map markers: replace inline-flex with inline-block for Word
+  c = c.replace(/display\s*:\s*inline-flex\s*;?/gi, 'display:inline-block;');
+  // Flex container for markers → normal text flow
+  c = c.replace(/display\s*:\s*flex\s*;?\s*gap\s*:\s*2px\s*;?\s*justify-content\s*:\s*center\s*;?\s*flex-wrap\s*:\s*wrap\s*;?/gi,
+    'text-align:center;');
+
+  // ── Step 7: Remove remaining CSS Word doesn't support ──
+  c = c.replace(/display\s*:\s*(flex|grid|inline-flex|inline-grid)\s*;?/gi, '');
+  c = c.replace(/flex[\w-]*\s*:\s*[^;"']*;?/gi, '');
+  c = c.replace(/gap\s*:\s*[^;"']*;?/gi, '');
+  c = c.replace(/align-items\s*:\s*[^;"']*;?/gi, '');
+  c = c.replace(/justify-content\s*:\s*[^;"']*;?/gi, '');
+  c = c.replace(/align-self\s*:\s*[^;"']*;?/gi, '');
+  c = c.replace(/grid[\w-]*\s*:\s*[^;"']*;?/gi, '');
+  c = c.replace(/border-radius\s*:\s*[^;"']*;?/gi, '');
+  c = c.replace(/box-shadow\s*:\s*[^;"']*;?/gi, '');
+  c = c.replace(/transition\s*:\s*[^;"']*;?/gi, '');
+  c = c.replace(/opacity\s*:\s*[^;"']*;?/gi, '');
+  c = c.replace(/cursor\s*:\s*pointer\s*;?/gi, '');
+  c = c.replace(/-webkit-[^;"':]+:\s*[^;"']*;?/gi, '');
+
+  // ── Step 8: Fix images — fixed dimensions for Word ──
   c = c.replace(/<img([^>]*)>/gi, function(m, attrs) {
-    // Ensure images have max-width for Word
-    if (attrs.indexOf('max-width') < 0) {
-      return '<img' + attrs + ' style="max-width:100%;height:auto">';
+    // Logo: fix to 24pt height
+    if (attrs.indexOf('logo-cell') >= 0 || m.indexOf('logo') >= 0) {
+      return '<img' + attrs.replace(/style="[^"]*"/gi,'') + ' width="48" height="24" style="width:48pt;height:24pt">';
+    }
+    // Signature images: fix to 50pt
+    if (attrs.indexOf('max-height:50px') >= 0 || attrs.indexOf('max-height:50pt') >= 0) {
+      return '<img' + attrs.replace(/style="[^"]*"/gi,'') + ' width="80" height="40" style="width:80pt;height:40pt">';
+    }
+    // Other images: constrain max width
+    if (attrs.indexOf('width') < 0) {
+      return '<img' + attrs + ' style="width:auto;height:auto;max-width:450pt">';
     }
     return m;
   });
 
+  // Remove editor artifacts
+  c = c.replace(/<div[^>]*class="rte-img-toolbar"[^>]*>[\\s\\S]*?<\\/div>/gi, '');
+  c = c.replace(/outline\s*:\s*[^;"']*;?/gi, '');
+  c = c.replace(/outline-offset\s*:\s*[^;"']*;?/gi, '');
+  // Clean leftover empty styles
+  c = c.replace(/style="\s*;?\s*"/gi, '');
+  // Remove user-select MSO pasted content
+  c = c.replace(/tab-stops\s*:\s*[^;"']*;?/gi, '');
+
+  // ── Step 9: MSO Word metadata ──
   var wordMeta = '<!--[if gte mso 9]><xml><w:WordDocument>' +
     '<w:View>Print<\\/w:View><w:Zoom>100<\\/w:Zoom>' +
     '<w:SpellingState>Clean<\\/w:SpellingState><w:GrammarState>Clean<\\/w:GrammarState>' +
@@ -992,74 +1074,81 @@ function downloadAsDoc(){
     '<\\/w:WordDocument><\\/xml><![endif]-->' +
     '<!--[if gte mso 9]><xml><w:LatentStyles DefLockedState="false" DefUnhideWhenUsed="false" DefSemiHidden="false" DefQFormat="false" DefPriority="99"/><\\/xml><![endif]-->';
 
+  // ── Step 10: MSO-Specific CSS ──
   var docCss =
+    /* ── Page geometry ── */
     '@page WordSection1{size:210mm 297mm;margin:15mm 10mm 15mm 20mm;mso-header-margin:5mm;mso-footer-margin:5mm}' +
     'div.WordSection1{page:WordSection1}' +
+    /* ── Base typography ── */
     'body{font-family:"Courier New",Courier,monospace;font-size:10pt;line-height:1.5;color:#1a1a1a;background:#fff;margin:0;padding:0}' +
-    'table{border-collapse:collapse;mso-table-lspace:0;mso-table-rspace:0}' +
+    /* ── Global table rules ── */
+    'table{border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt}' +
     'td,th{mso-line-height-rule:exactly}' +
-    '.toolbar,.no-print{display:none!important}' +
+    /* ── Hide toolbar ── */
+    '.toolbar,.no-print,.screen-only{display:none!important}' +
+    /* ── Page structure ── */
     '.page-container{margin:0;padding:0}' +
-    '.page{margin:0;padding:0;border:none;box-shadow:none;min-height:auto;background:#fff}' +
+    '.page{margin:0;padding:0;border:none;box-shadow:none;min-height:auto;max-height:none;height:auto;overflow:visible;background:#fff}' +
     '.page-break{page-break-before:always;mso-break-type:section-break}' +
     '.page-top{padding-top:0}' +
-    '.cover{page-break-after:always;min-height:auto;height:auto;padding:30mm 20mm;text-align:center}' +
+    /* ── Cover page ── */
+    '.cover{page-break-after:always;min-height:auto;height:auto;padding:30mm 20mm;text-align:center;max-height:none;overflow:visible}' +
     '.cover-label{font-size:16pt;font-weight:bold;margin-bottom:4pt;letter-spacing:2pt}' +
     '.cover-company{font-size:14pt;font-weight:bold;color:#0066B3;margin-bottom:40pt}' +
-    '.cover-title-box{border:2pt solid #000;padding:15pt 30pt;margin:0 auto 40pt;text-align:center}' +
+    '.cover-title-box{border:2pt solid #000;padding:15pt 30pt;margin:0 auto 40pt;text-align:center;mso-element:para-border-div}' +
     '.cover-title{font-size:16pt;font-weight:bold;line-height:1.3}' +
     '.cover-meta{width:70%;margin:0 auto 40pt;text-align:left}' +
     '.cover-meta table{width:100%;font-size:11pt;border-collapse:collapse}' +
     '.cover-meta td{padding:4pt 4pt;vertical-align:top;border:none}' +
-    '.sig-table{width:100%;border-collapse:collapse;margin-top:30pt}' +
-    '.sig-table td{border:1pt solid #999;padding:6pt 8pt;text-align:center;font-size:9pt;vertical-align:top}' +
+    /* ── Signature table ── */
+    '.sig-table{width:100%;border-collapse:collapse;margin-top:30pt;mso-pagination:lines-together}' +
+    '.sig-table td{border:1pt solid #999;padding:6pt 8pt;text-align:center;font-size:9pt;vertical-align:top;mso-pattern:auto none;background-color:#f0f0f0}' +
     '.sig-label{font-weight:bold;font-size:10pt;display:block;margin-bottom:50pt}' +
     '.sig-name{font-weight:bold;border-top:1pt solid #000;display:inline-block;padding-top:4pt;min-width:120pt;margin-top:50pt}' +
     '.sig-pos{font-size:8pt;color:#555;margin-top:2pt}' +
-    '.content-page{padding:0;min-height:auto}' +
-    '.content-wrap-table{width:100%;border-collapse:collapse;border:none;mso-border-alt:none}' +
-    '.content-wrap-table,.content-wrap-table thead,.content-wrap-table tbody,.content-wrap-table tr,.content-thead-cell,.content-tbody-cell{border:none;padding:0;margin:0;mso-border-alt:none}' +
-    '.content-thead-cell{padding:0 0 6pt 0;vertical-align:top;border:none}' +
-    '.content-tbody-cell{padding:0;vertical-align:top;border:none;word-wrap:break-word}' +
-    '.sec-content{margin:4pt 0 12pt;font-size:10pt}' +
-    '.sec-content p,.sec-content div,.sec-content span,.sec-content li{margin-left:0!important;margin-right:0!important;text-indent:0!important}' +
-    '.sec-content ul,.sec-content ol{margin-left:20pt!important;padding-left:0!important}' +
-    '.sec-content table{width:100%!important}' +
-    '.sec-content img{max-width:100%}' +
-    '.ik-header{width:100%;border-collapse:collapse;border:1.5pt solid #000;margin-bottom:0;font-size:9pt}' +
+    /* ── Content page (linear, no wrapper table) ── */
+    '.content-page{padding:0;min-height:auto;height:auto;max-height:none;overflow:visible}' +
+    /* ── IK Header (kop dokumen) — repeatable via <thead> ── */
+    '.ik-header{width:100%;border-collapse:collapse;border:1.5pt solid #000;margin-bottom:6pt;font-size:9pt;mso-table-lspace:0pt;mso-table-rspace:0pt}' +
     '.ik-header td{border:1pt solid #000;padding:3pt 8pt;vertical-align:middle}' +
     '.ik-header .logo-cell{width:50pt;text-align:center;padding:3pt 6pt}' +
-    '.ik-header .logo-cell img{height:24pt}' +
+    '.ik-header .logo-cell img{width:48pt;height:24pt}' +
     '.ik-header .company-cell{font-weight:bold;font-size:9.5pt;text-align:center}' +
     '.ik-header .title-cell{font-weight:bold;font-size:9.5pt;text-align:center}' +
     '.ik-header .label-cell{font-weight:bold;width:85pt;font-size:8.5pt;white-space:nowrap}' +
     '.ik-header .value-cell{font-size:9pt}' +
-    'table.tbl{width:100%;border-collapse:collapse;margin:6pt 0 12pt;font-size:9.5pt}' +
+    /* ── Content tables (tbl) ── */
+    'table.tbl{width:100%;border-collapse:collapse;margin:6pt 0 12pt;font-size:9.5pt;mso-table-lspace:0pt;mso-table-rspace:0pt}' +
     'table.tbl th,table.tbl td{border:1pt solid #000;padding:3pt 6pt;vertical-align:top}' +
-    'table.tbl th{background:#D9E2F3;font-weight:bold;text-align:center;font-size:9pt;mso-pattern:auto none;background-color:#D9E2F3}' +
+    'table.tbl th{background-color:#D9E2F3;mso-pattern:auto none;font-weight:bold;text-align:center;font-size:9pt}' +
     'table.tbl td.no{text-align:center;width:25pt}' +
-    '.sec-title{font-size:11pt;font-weight:bold;margin:14pt 0 6pt;padding:3pt 0;border-bottom:1.5pt solid #000}' +
+    'table.tbl thead tr{mso-header-row-yes:yes}' +
+    'table.tbl tr{mso-pagination:lines-together}' +
+    /* ── Section titles (anti-orphan) ── */
+    '.sec-title{font-size:11pt;font-weight:bold;margin:14pt 0 6pt;padding:3pt 0;border-bottom:1.5pt solid #000;mso-pagination:lines-together;page-break-after:avoid}' +
     '.sec-num{margin-right:6pt}' +
-    '.sub-title{font-weight:bold;font-size:10pt;margin:8pt 0 4pt}' +
+    '.sub-title{font-weight:bold;font-size:10pt;margin:8pt 0 4pt;mso-pagination:lines-together;page-break-after:avoid}' +
+    /* ── Content typography ── */
     'p.content{margin:4pt 0 8pt;text-align:justify;font-size:10pt}' +
     'ul.content-list{margin:4pt 0 8pt 20pt;font-size:10pt}' +
     'ul.content-list li{margin-bottom:2pt}' +
     'ol.step-list{margin:4pt 0 8pt 20pt;font-size:10pt}' +
     'ol.step-list li{margin-bottom:3pt;padding-left:4pt}' +
-    '.qr-block{border:1.5pt solid #000;padding:10pt;margin:14pt 0}' +
+    '.sec-content{margin:4pt 0 12pt;font-size:10pt;mso-pagination:widow-orphan}' +
+    '.sec-content p,.sec-content div,.sec-content span,.sec-content li{margin-left:0!important;margin-right:0!important;text-indent:0!important}' +
+    '.sec-content ul,.sec-content ol{margin-left:20pt!important;padding-left:0!important}' +
+    '.sec-content table{width:100%!important}' +
+    '.sec-content img{max-width:450pt}' +
+    /* ── QR block ── */
+    '.qr-block{margin:14pt 0;mso-pagination:lines-together;page-break-inside:avoid}' +
     '.qr-block td{border:none;padding:6pt;vertical-align:top}' +
     '.qr-block .qr-text{font-size:8.5pt;color:#333}' +
-    'img{max-width:100%;height:auto;mso-width-percent:1000;mso-height-percent:0;mso-width-relative:margin}' +
-    /* Ensure section titles don't orphan in Word */
-    '.sec-title{mso-pagination:lines-together;page-break-after:avoid}' +
-    '.sub-title{mso-pagination:lines-together;page-break-after:avoid}' +
-    '.sec-content{mso-pagination:widow-orphan}' +
-    'table.tbl tr{mso-pagination:lines-together}' +
-    '.sig-table{mso-pagination:lines-together}' +
-    '.cover-title-box{mso-element:para-border-div}' +
-    /* Heat map table colors for Word */
+    /* ── Images — fixed dimensions ── */
+    'img{mso-width-source:userset;mso-height-source:userset}' +
+    /* ── Heat Map colors ── */
     'td[style*="background"]{mso-pattern:auto none}';
 
+  // ── Step 11: Assemble final .doc HTML ──
   var h='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns:v="urn:schemas-microsoft-com:vml" xmlns="http://www.w3.org/TR/REC-html40">' +
     '<head><meta charset="utf-8"><meta http-equiv="Content-Type" content="text/html; charset=utf-8">' + wordMeta +
     '<style>' + docCss + '<\\/style></head><body><div class="WordSection1">' + c + '</div></body></html>';
