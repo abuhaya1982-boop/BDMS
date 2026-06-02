@@ -329,6 +329,9 @@ body{font-family:'Courier Prime','Courier New',Courier,monospace;font-size:10pt;
 .toolbar button:hover{background:#1d4ed8}
 .toolbar .btn-green{background:#16a34a}
 .toolbar .btn-green:hover{background:#15803d}
+.toolbar .btn-lite{background:#475569;font-weight:500}
+.toolbar .btn-lite:hover{background:#334155}
+.toolbar button:disabled{opacity:.6;cursor:default}
 .toolbar .spacer{flex:1}
 .toolbar .info{font-size:10px;color:#94a3b8;max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
@@ -904,7 +907,8 @@ table.step-tbl li{margin-bottom:1px}
   <span class="spacer"></span>
   <span class="info" title="${escH(gdrivePath)}">&#128193; GDrive: ${escH(gdrivePath)}</span>
   <button onclick="window.print()">&#128424; Cetak / PDF</button>
-  <button class="btn-green" onclick="downloadAsDoc()">&#128196; Download .doc</button>
+  <button class="btn-green" onclick="downloadDocxNative(this)">&#128196; Download Word (.docx)</button>
+  <button class="btn-lite" onclick="downloadAsDoc()" title="Versi ringan (.doc) bila server tidak tersedia">.doc (cadangan)</button>
 </div>
 <div class="page-container">
   ${coverHtml}
@@ -913,6 +917,37 @@ table.step-tbl li{margin-bottom:1px}
   ${screenPage3}
 </div>
 <script>
+// ── Primary: native .docx generated server-side (template-accurate, robust) ──
+function downloadDocxNative(btn){
+  var id = ${d.id};
+  var orig = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled=true; btn.innerHTML='\\u23F3 Menyiapkan...'; }
+  function restore(){ if(btn){ btn.disabled=false; btn.innerHTML=orig; } }
+  fetch('/api/dokumen/'+id+'/docx',{credentials:'same-origin'})
+    .then(function(r){
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      var fn='${nom}_Rev${rev}.docx';
+      var cd=r.headers.get('Content-Disposition')||'';
+      var m=cd.match(/filename="?([^"]+)"?/);
+      if(m) fn=m[1];
+      return r.blob().then(function(b){ return {blob:b, fn:fn}; });
+    })
+    .then(function(o){
+      var a=document.createElement('a');
+      a.href=URL.createObjectURL(o.blob);
+      a.download=o.fn;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(a.href); },1500);
+      restore();
+    })
+    .catch(function(e){
+      restore();
+      alert('Gagal mengunduh Word (.docx): '+e.message+'\\n\\nPastikan Anda masih login. Sebagai alternatif, gunakan tombol ".doc (cadangan)".');
+    });
+}
+
 function downloadAsDoc(){
   // ═══════════════════════════════════════════════════════════════════
   // MSO-Specific Word Export — Linear Structure (No wrapper table)

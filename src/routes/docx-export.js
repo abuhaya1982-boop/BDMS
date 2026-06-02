@@ -4,6 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const { getDB } = require('../db');
 const h = require('../helpers');
+let QRCode = null;
+try { QRCode = require('qrcode'); } catch { /* optional */ }
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   ImageRun, Header, Footer, AlignmentType, PageBreak, HeadingLevel,
@@ -330,7 +332,8 @@ function makeHeaderTable(nom, judul, rev, tglTerbit) {
 // ═══════════════════════════════════════════
 function buildDocx(doc, data) {
   const { steps, definisi, sdm, tools, material, risiko, formulir,
-    dokPendukung, dokReferensi, dokPerizinan, changeHistory } = data;
+    dokPendukung, dokReferensi, dokPerizinan, changeHistory,
+    qrBuffer, qrText } = data;
 
   const nom = doc.nomor_dokumen || '';
   const judul = doc.judul || '';
@@ -393,18 +396,8 @@ function buildDocx(doc, data) {
 
   const coverChildren = [];
 
-  // Logo at top
-  if (LOGO_BUF) {
-    coverChildren.push(new Paragraph({
-      alignment: AlignmentType.CENTER,
-      spacing: { after: 200 },
-      children: [new ImageRun({
-        type: 'jpg', data: LOGO_BUF,
-        transformation: { width: 220, height: 116 },
-        altText: { title: 'PLN NP', description: 'Logo PLN Nusantara Power', name: 'logo-cover' },
-      })],
-    }));
-  }
+  // NOTE: Cover-page logo intentionally omitted (per unit standard for halaman pengesahan).
+  // The PLN NP logo still appears in the document header (kop) on every content page.
 
   // Spacer to push content toward vertical center
   coverChildren.push(new Paragraph({ spacing: { before: 1600 } }));
@@ -432,8 +425,9 @@ function buildDocx(doc, data) {
     children: [new TextRun({ text: '', font: FONT, size: 4 })],
   }));
 
-  // Metadata table (no borders)
+  // Metadata table (no borders) — centered on page
   coverChildren.push(new Table({
+    alignment: AlignmentType.CENTER,
     width: { size: 6000, type: WidthType.DXA },
     columnWidths: [2800, 400, 2800],
     rows: [
@@ -442,9 +436,9 @@ function buildDocx(doc, data) {
       ['TANGGAL DIPERBARUI', fmtDate(doc.tanggal_diperbarui || doc.updated_at)],
       ['REVISI', rev],
     ].map(([label, val]) => new TableRow({ children: [
-      cell(label, { width: 2800, bold: true, size: SZ.lg, noBorder: true }),
+      cell(label, { width: 2800, bold: true, size: SZ.lg, align: AlignmentType.RIGHT, noBorder: true }),
       cell(':', { width: 400, bold: true, size: SZ.lg, align: AlignmentType.CENTER, noBorder: true }),
-      cell(val, { width: 2800, size: SZ.lg, noBorder: true }),
+      cell(val, { width: 2800, size: SZ.lg, align: AlignmentType.LEFT, noBorder: true }),
     ]})),
   }));
 
@@ -586,6 +580,15 @@ function buildDocx(doc, data) {
     if (!risiko || !risiko.length) return;
     addSectionTitle('Identifikasi Risiko');
 
+    // Map inherent & residual risk positions onto the heat map (by risk number)
+    const inherentMap = {}, residualMap = {};
+    risiko.forEach((r, idx) => {
+      const p = parseInt(r.kemungkinan) || 0, d = parseInt(r.dampak_level) || 0;
+      if (p > 0 && d > 0) { const k = `${p}-${d}`; (inherentMap[k] = inherentMap[k] || []).push(idx + 1); }
+      const rp = parseInt(r.residual_kemungkinan) || 0, rd = parseInt(r.residual_dampak) || 0;
+      if (rp > 0 && rd > 0) { const k = `${rp}-${rd}`; (residualMap[k] = residualMap[k] || []).push(idx + 1); }
+    });
+
     // Inherent Risk Table
     addSubTitle('Identifikasi Risiko (Inherent)');
     const iW = scaleWidths([480, 2200, 1800, 800, 800, 700, 2858]);
@@ -673,7 +676,19 @@ function buildDocx(doc, data) {
         ...[1,2,3,4,5].map((d, idx) => {
           const rm = rmLookup(row.p, d);
           const w = idx < 4 ? hmCellW : hmLastW;
-          return cell(String(rm.s), { width: w, align: AlignmentType.CENTER, bold: true, shade: rm.c, size: SZ.xl, vAlign: VerticalAlign.CENTER });
+          const k = `${row.p}-${d}`;
+          const inh = inherentMap[k] || [], res = residualMap[k] || [];
+          const cellKids = [new Paragraph({
+            alignment: AlignmentType.CENTER, spacing: { after: 0 },
+            children: [new TextRun({ text: String(rm.s), bold: true, font: FONT, size: SZ.xl })],
+          })];
+          if (inh.length || res.length) {
+            const markRuns = [];
+            inh.forEach(n => markRuns.push(new TextRun({ text: '●' + n + ' ', bold: true, font: FONT, size: SZ.xs, color: '000000' })));
+            res.forEach(n => markRuns.push(new TextRun({ text: '○' + n + ' ', bold: true, font: FONT, size: SZ.xs, color: 'C2410C' })));
+            cellKids.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 20, after: 0 }, children: markRuns }));
+          }
+          return cell('', { width: w, shade: rm.c, vAlign: VerticalAlign.CENTER, children: cellKids });
         }),
       ]});
     });
@@ -697,8 +712,19 @@ function buildDocx(doc, data) {
       rows: [hmHeaderRow, ...hmDataRows, hmFooterRow],
     }));
 
+    // Marker legend (inherent vs residual)
+    contentChildren.push(new Paragraph({
+      spacing: { before: 100, after: 40 },
+      children: [
+        new TextRun({ text: '●', bold: true, font: FONT, size: SZ.sm, color: '000000' }),
+        new TextRun({ text: ' n = Inherent Risk (No. risiko)      ', font: FONT, size: SZ.xs }),
+        new TextRun({ text: '○', bold: true, font: FONT, size: SZ.sm, color: 'C2410C' }),
+        new TextRun({ text: ' n = Target / Residual Risk (No. risiko)', font: FONT, size: SZ.xs }),
+      ],
+    }));
+
     // Legend as separate small table
-    contentChildren.push(new Paragraph({ spacing: { before: 80 } }));
+    contentChildren.push(new Paragraph({ spacing: { before: 40 } }));
     const legCellW = Math.floor(CONTENT_W / legendColors.length);
     contentChildren.push(new Table({
       width: { size: CONTENT_W, type: WidthType.DXA },
@@ -836,8 +862,50 @@ function buildDocx(doc, data) {
     }
   }
 
+  // ═══ QR CODE BLOCK (dokumen verification) ═══
+  if (qrBuffer) {
+    contentChildren.push(new Paragraph({ spacing: { before: 360, after: 100 } }));
+    const qrColW = 1700;
+    const qrTxtW = CONTENT_W - qrColW;
+    contentChildren.push(new Table({
+      width: { size: CONTENT_W, type: WidthType.DXA },
+      columnWidths: [qrColW, qrTxtW],
+      rows: [new TableRow({ children: [
+        new TableCell({
+          borders, width: { size: qrColW, type: WidthType.DXA },
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 60, bottom: 60, left: 60, right: 60 },
+          children: [new Paragraph({
+            alignment: AlignmentType.CENTER, spacing: { after: 0 },
+            children: [new ImageRun({
+              type: 'png', data: qrBuffer,
+              transformation: { width: 110, height: 110 },
+              altText: { title: 'QR Code', description: 'QR verifikasi dokumen', name: 'qr' },
+            })],
+          })],
+        }),
+        new TableCell({
+          borders, width: { size: qrTxtW, type: WidthType.DXA },
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 60, bottom: 60, left: 120, right: 80 },
+          children: [
+            new Paragraph({ spacing: { after: 40 }, children: [
+              new TextRun({ text: 'Verifikasi Keaslian Dokumen', bold: true, font: FONT, size: SZ.md }),
+            ]}),
+            new Paragraph({ spacing: { after: 30 }, children: [
+              new TextRun({ text: 'Pindai QR Code untuk memverifikasi keaslian dan mengakses dokumen elektronik terkendali pada repositori resmi.', font: FONT, size: SZ.sm }),
+            ]}),
+            new Paragraph({ spacing: { after: 0 }, children: [
+              new TextRun({ text: qrText || `${nom} • Rev.${rev}`, font: FONT, size: SZ.xs, color: CLR.gray }),
+            ]}),
+          ],
+        }),
+      ]})],
+    }));
+  }
+
   // Footer info
-  contentChildren.push(new Paragraph({ spacing: { before: 400 } }));
+  contentChildren.push(new Paragraph({ spacing: { before: 360 } }));
   contentChildren.push(new Paragraph({
     border: { top: { style: BorderStyle.SINGLE, size: 1, color: 'CCCCCC', space: 4 } },
     children: [
@@ -931,10 +999,26 @@ router.get('/:id/docx', h.requireAuth, async (req, res) => {
     let customSections = null;
     if (doc.custom_sections) { try { customSections = JSON.parse(doc.custom_sections); } catch {} }
 
+    // Generate QR code (matches print-preview QR content)
+    let qrBuffer = null, qrText = '';
+    try {
+      let cloudBase = '';
+      try { const s = db.prepare("SELECT value FROM settings WHERE key='cloud_base_url'").get(); cloudBase = (s && s.value) || ''; } catch {}
+      const unitName = doc.unit_nama || '';
+      if (cloudBase) {
+        qrText = `${cloudBase.replace(/\/+$/,'')}/${unitName.replace(/\s+/g,'_')}/${doc.nomor_dokumen}/`;
+      } else {
+        qrText = `BDMS|${doc.nomor_dokumen}|Rev${doc.revisi||'00'}|${unitName}`;
+      }
+      if (QRCode) {
+        qrBuffer = await QRCode.toBuffer(qrText, { type: 'png', width: 240, margin: 1, errorCorrectionLevel: 'M' });
+      }
+    } catch (e) { console.warn('QR generation skipped:', e.message); }
+
     // Build DOCX
     const docx = buildDocx(
       { ...doc, custom_sections: customSections },
-      { steps, definisi, sdm, tools, material, risiko, formulir, dokPendukung, dokReferensi, dokPerizinan, changeHistory }
+      { steps, definisi, sdm, tools, material, risiko, formulir, dokPendukung, dokReferensi, dokPerizinan, changeHistory, qrBuffer, qrText }
     );
 
     const buffer = await Packer.toBuffer(docx);
