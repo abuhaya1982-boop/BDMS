@@ -141,6 +141,8 @@ router.get('/:id', h.requireAuth, (req, res) => {
       dokumen_pendukung,
       dokumen_referensi,
       dokumen_perizinan,
+      attachments_formulir: Array.isArray(konten.attachments_formulir) ? konten.attachments_formulir : [],
+      attachments_data_teknik: Array.isArray(konten.attachments_data_teknik) ? konten.attachments_data_teknik : [],
       sdm, tools, material, formulir, risiko, approvals
     });
   } catch (err) {
@@ -241,10 +243,14 @@ router.post('/', h.requireAuth, (req, res) => {
       );
     const docId = result.lastInsertRowid;
 
-    // Save steps → ik_steps + konten JSON
+    // Save steps → ik_steps + konten JSON (steps extras + file attachments)
     const extraSteps = saveSteps(db, docId, stepsExtra);
-    if (Object.keys(extraSteps || {}).length) {
-      db.prepare('UPDATE ik_documents SET konten=? WHERE id=?').run(JSON.stringify({ steps: extraSteps }), docId);
+    const kontenObj = {};
+    if (Object.keys(extraSteps || {}).length) kontenObj.steps = extraSteps;
+    if (Array.isArray(b.attachments_formulir) && b.attachments_formulir.length) kontenObj.attachments_formulir = b.attachments_formulir;
+    if (Array.isArray(b.attachments_data_teknik) && b.attachments_data_teknik.length) kontenObj.attachments_data_teknik = b.attachments_data_teknik;
+    if (Object.keys(kontenObj).length) {
+      db.prepare('UPDATE ik_documents SET konten=? WHERE id=?').run(JSON.stringify(kontenObj), docId);
     }
 
     // Sub-tables
@@ -305,12 +311,21 @@ router.put('/:id', h.requireAuth, (req, res) => {
     params.push(id);
     db.prepare(`UPDATE ik_documents SET ${fields.join(',')} WHERE id=?`).run(...params);
 
-    // Save steps (object format from frontend)
-    if (b.steps !== undefined && typeof b.steps === 'object' && !Array.isArray(b.steps)) {
-      const extraSteps = saveSteps(db, id, b.steps);
-      if (Object.keys(extraSteps || {}).length) {
-        db.prepare('UPDATE ik_documents SET konten=? WHERE id=?').run(JSON.stringify({ steps: extraSteps }), id);
+    // Save steps + attachments → konten JSON (merge with existing so unspecified fields persist)
+    {
+      let kontenObj = {};
+      try { if (doc.konten) kontenObj = JSON.parse(doc.konten) || {}; } catch {}
+      if (b.steps !== undefined && typeof b.steps === 'object' && !Array.isArray(b.steps)) {
+        const extraSteps = saveSteps(db, id, b.steps);
+        if (Object.keys(extraSteps || {}).length) kontenObj.steps = extraSteps; else delete kontenObj.steps;
       }
+      if (b.attachments_formulir !== undefined) {
+        if (Array.isArray(b.attachments_formulir) && b.attachments_formulir.length) kontenObj.attachments_formulir = b.attachments_formulir; else delete kontenObj.attachments_formulir;
+      }
+      if (b.attachments_data_teknik !== undefined) {
+        if (Array.isArray(b.attachments_data_teknik) && b.attachments_data_teknik.length) kontenObj.attachments_data_teknik = b.attachments_data_teknik; else delete kontenObj.attachments_data_teknik;
+      }
+      db.prepare('UPDATE ik_documents SET konten=? WHERE id=?').run(Object.keys(kontenObj).length ? JSON.stringify(kontenObj) : null, id);
     }
 
     // Replace sub-tables if provided

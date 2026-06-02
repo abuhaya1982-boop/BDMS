@@ -11,7 +11,11 @@ const API = {
 
     try {
       const res = await fetch(this.base + endpoint, opts);
-      const json = await res.json();
+
+      // Parse body defensively — proxies/WAF may return HTML (not JSON) on 403/5xx
+      const raw = await res.text();
+      let json = null;
+      try { json = raw ? JSON.parse(raw) : null; } catch { json = null; }
 
       if (!res.ok) {
         if (res.status === 401 && APP.loggedIn) {
@@ -20,8 +24,18 @@ const API = {
           document.getElementById('mainApp').style.display = 'none';
           showToast('Sesi berakhir, silakan login kembali', 'warning');
         }
-        throw new Error(json.message || json.error || `HTTP ${res.status}`);
+        let msg = (json && (json.message || json.error)) || '';
+        if (!msg) {
+          if (res.status === 403) msg = 'Akses ditolak (403). Permintaan diblokir oleh server/proxy keamanan. Coba lagi atau hubungi administrator.';
+          else if (res.status === 404) msg = 'Data tidak ditemukan (404).';
+          else if (res.status >= 500) msg = `Server bermasalah (${res.status}). Silakan coba lagi.`;
+          else msg = `HTTP ${res.status}`;
+        }
+        throw new Error(msg);
       }
+
+      // OK but unparseable body — return empty success envelope
+      if (json === null) return { success: true, data: null };
       return json;
     } catch (err) {
       if (err.name === 'TypeError') {

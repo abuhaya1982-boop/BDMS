@@ -25,6 +25,38 @@ const CLR = { primary: '2A7489', dark: '000000', gray: '808080', headerBg: 'D9E2
 let LOGO_BUF = null;
 try { LOGO_BUF = fs.readFileSync(path.join(__dirname, '..', 'assets', 'logo-pln-np.jpeg')); } catch {}
 
+// ── Data URL → { mime, buf } ──
+function parseDataUrl(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== 'string') return null;
+  const m = /^data:([^;,]*)(;base64)?,([\s\S]*)$/.exec(dataUrl);
+  if (!m) return null;
+  try {
+    const mime = m[1] || '';
+    const buf = m[2] ? Buffer.from(m[3], 'base64') : Buffer.from(decodeURIComponent(m[3]));
+    return { mime, buf };
+  } catch { return null; }
+}
+
+// ── Lightweight image dimension reader (PNG/JPEG/GIF) ──
+function imageDims(buf, mime) {
+  try {
+    if (/png/i.test(mime) && buf.length > 24) return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+    if (/gif/i.test(mime) && buf.length > 10) return { w: buf.readUInt16LE(6), h: buf.readUInt16LE(8) };
+    if (/jpe?g/i.test(mime)) {
+      let off = 2;
+      while (off + 9 < buf.length) {
+        if (buf[off] !== 0xFF) { off++; continue; }
+        const marker = buf[off + 1];
+        if (marker >= 0xC0 && marker <= 0xCF && ![0xC4, 0xC8, 0xCC].includes(marker)) {
+          return { h: buf.readUInt16BE(off + 5), w: buf.readUInt16BE(off + 7) };
+        }
+        off += 2 + buf.readUInt16BE(off + 2);
+      }
+    }
+  } catch {}
+  return null;
+}
+
 // PLN NP Risk Matrix 5x5 — fallback if DB not available
 const RISK_MATRIX_FALLBACK = {
   '1-1':{s:1,l:'LOW',c:'00B050'},'1-2':{s:5,l:'LOW',c:'00B050'},'1-3':{s:10,l:'LOW TO MODERATE',c:'92D050'},'1-4':{s:15,l:'MODERATE',c:'FFFF00'},'1-5':{s:20,l:'HIGH',c:'FF0000'},
@@ -333,7 +365,7 @@ function makeHeaderTable(nom, judul, rev, tglTerbit) {
 function buildDocx(doc, data) {
   const { steps, definisi, sdm, tools, material, risiko, formulir,
     dokPendukung, dokReferensi, dokPerizinan, changeHistory,
-    qrBuffer, qrText } = data;
+    qrBuffer, qrText, attachmentsFormulir, attachmentsDataTeknik } = data;
 
   const nom = doc.nomor_dokumen || '';
   const judul = doc.judul || '';
@@ -537,6 +569,45 @@ function buildDocx(doc, data) {
       spacing: { before: 180, after: 80 },
       children: [new TextRun({ text: label, bold: true, font: FONT, size: SZ.md })],
     }));
+  }
+
+  // Render attached files: embed images, list other formats as references
+  function addAttachments(list) {
+    if (!Array.isArray(list) || !list.length) return;
+    addSubTitle('Lampiran Dokumen');
+    const MAXW_PX = 460; // ≈ content width at 96 dpi
+    list.forEach((att, i) => {
+      const name = att.name || ('Lampiran ' + (i + 1));
+      const sizeNum = parseInt(att.size) || 0;
+      const sizeStr = sizeNum < 1024 ? sizeNum + ' B' : sizeNum < 1048576 ? (sizeNum / 1024).toFixed(1) + ' KB' : (sizeNum / 1048576).toFixed(1) + ' MB';
+      contentChildren.push(new Paragraph({
+        spacing: { before: 120, after: 40 },
+        children: [
+          new TextRun({ text: `• ${name} `, bold: true, font: FONT, size: SZ.sm }),
+          new TextRun({ text: `(${sizeStr})`, font: FONT, size: SZ.xs, color: CLR.gray }),
+        ],
+      }));
+      const parsed = parseDataUrl(att.data);
+      if (parsed && /^image\//i.test(parsed.mime)) {
+        const dims = imageDims(parsed.buf, parsed.mime) || { w: MAXW_PX, h: Math.round(MAXW_PX * 0.75) };
+        let w = dims.w || MAXW_PX, hgt = dims.h || Math.round(MAXW_PX * 0.75);
+        if (w > MAXW_PX) { hgt = Math.round(hgt * MAXW_PX / w); w = MAXW_PX; }
+        const fmt = /png/i.test(parsed.mime) ? 'png' : /gif/i.test(parsed.mime) ? 'gif' : /bmp/i.test(parsed.mime) ? 'bmp' : 'jpg';
+        try {
+          contentChildren.push(new Paragraph({
+            spacing: { after: 100 },
+            children: [new ImageRun({ type: fmt, data: parsed.buf, transformation: { width: w, height: hgt } })],
+          }));
+        } catch {
+          contentChildren.push(new Paragraph({ children: [new TextRun({ text: '  (gambar lampiran tidak dapat ditampilkan)', italics: true, font: FONT, size: SZ.xs, color: CLR.gray })] }));
+        }
+      } else {
+        contentChildren.push(new Paragraph({
+          spacing: { after: 80 }, indent: { left: 360 },
+          children: [new TextRun({ text: 'Berkas terlampir tersedia pada versi digital dokumen (aplikasi BDMS).', italics: true, font: FONT, size: SZ.xs, color: CLR.gray })],
+        }));
+      }
+    });
   }
 
   // Generic table builder
@@ -768,9 +839,11 @@ function buildDocx(doc, data) {
       case 'ruang_lingkup':
       case 'data_teknik': {
         const content = steps[sec.id] || '';
-        if (content || sec.id === 'tujuan' || sec.id === 'ruang_lingkup') {
+        const dtAtt = sec.id === 'data_teknik' ? (attachmentsDataTeknik || []) : [];
+        if (content || dtAtt.length || sec.id === 'tujuan' || sec.id === 'ruang_lingkup') {
           addSectionTitle(sec.label);
           htmlToParagraphs(content).forEach(p => contentChildren.push(p));
+          if (dtAtt.length) addAttachments(dtAtt);
           secNum++;
         }
         break;
@@ -837,9 +910,11 @@ function buildDocx(doc, data) {
       }
       case 'formulir': {
         const fc = steps.formulir || '';
-        if (fc) {
+        const fmAtt = attachmentsFormulir || [];
+        if (fc || fmAtt.length) {
           addSectionTitle(sec.label);
           htmlToParagraphs(fc).forEach(p => contentChildren.push(p));
+          if (fmAtt.length) addAttachments(fmAtt);
           secNum++;
         }
         break;
@@ -999,6 +1074,10 @@ router.get('/:id/docx', h.requireAuth, async (req, res) => {
     let customSections = null;
     if (doc.custom_sections) { try { customSections = JSON.parse(doc.custom_sections); } catch {} }
 
+    // File attachments (formulir & data teknik) stored in konten JSON
+    const attachmentsFormulir = Array.isArray(konten.attachments_formulir) ? konten.attachments_formulir : [];
+    const attachmentsDataTeknik = Array.isArray(konten.attachments_data_teknik) ? konten.attachments_data_teknik : [];
+
     // Generate QR code (matches print-preview QR content)
     let qrBuffer = null, qrText = '';
     try {
@@ -1018,7 +1097,7 @@ router.get('/:id/docx', h.requireAuth, async (req, res) => {
     // Build DOCX
     const docx = buildDocx(
       { ...doc, custom_sections: customSections },
-      { steps, definisi, sdm, tools, material, risiko, formulir, dokPendukung, dokReferensi, dokPerizinan, changeHistory, qrBuffer, qrText }
+      { steps, definisi, sdm, tools, material, risiko, formulir, dokPendukung, dokReferensi, dokPerizinan, changeHistory, qrBuffer, qrText, attachmentsFormulir, attachmentsDataTeknik }
     );
 
     const buffer = await Packer.toBuffer(docx);

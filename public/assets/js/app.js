@@ -587,6 +587,37 @@ table.step-tbl li{margin-bottom:1px}
     return html;
   }
 
+  // ── Render attachment files (image previews + file list) ──
+  function renderAttachments(list) {
+    if (!Array.isArray(list) || !list.length) return '';
+    let out = '<div class="attach-block" style="margin-top:10px">';
+    out += '<div class="attach-caption" style="font-size:9pt;font-weight:700;color:#444;margin-bottom:6px">&#128206; Lampiran Dokumen:</div>';
+    list.forEach((att, i) => {
+      const name = escH(att.name || ('Lampiran ' + (i + 1)));
+      const data = att.data || '';
+      const sizeNum = parseInt(att.size) || 0;
+      const sizeStr = sizeNum < 1024 ? sizeNum + ' B' : sizeNum < 1048576 ? (sizeNum / 1024).toFixed(1) + ' KB' : (sizeNum / 1048576).toFixed(1) + ' MB';
+      const isImg = /^data:image\//i.test(data);
+      const isPdf = /^data:application\/pdf/i.test(data);
+      out += '<div class="attach-item" style="margin-bottom:10px;page-break-inside:avoid;border:1px solid #ddd;border-radius:4px;overflow:hidden">';
+      out += `<div style="background:#f3f4f6;padding:5px 8px;font-size:8.5pt;color:#333;display:flex;justify-content:space-between;border-bottom:1px solid #e5e7eb"><span style="font-weight:600">${name}</span><span style="color:#777">${sizeStr}</span></div>`;
+      if (isImg && data) {
+        out += `<div style="padding:6px;text-align:center;background:#fff"><img src="${data}" alt="${name}" style="max-width:100%;max-height:240mm;height:auto;border:1px solid #eee"></div>`;
+      } else if (isPdf && data) {
+        // Embedded PDF viewer (screen); printed copy shows a note + link
+        out += `<object data="${data}" type="application/pdf" class="screen-only" style="width:100%;height:300mm;border:0"></object>`;
+        out += `<div class="print-only" style="padding:10px;font-size:8.5pt;color:#555">Dokumen PDF terlampir &mdash; lihat versi digital untuk isi lengkap. <a href="${data}" download="${name}">Unduh ${name}</a></div>`;
+      } else if (data) {
+        out += `<div style="padding:10px;font-size:8.5pt;color:#555">Berkas terlampir: <a href="${data}" download="${name}">${name}</a> (${sizeStr})</div>`;
+      } else {
+        out += `<div style="padding:10px;font-size:8.5pt;color:#999">${name} (${sizeStr}) &mdash; data tidak tersedia</div>`;
+      }
+      out += '</div>';
+    });
+    out += '</div>';
+    return out;
+  }
+
   // ── PAGE 3+: ISI DOKUMEN (Template-Driven) ──
   let secNum = 1;
   let body = '';
@@ -719,9 +750,10 @@ table.step-tbl li{margin-bottom:1px}
       case 'ruang_lingkup':
       case 'data_teknik': {
         const content = steps[sec.id] || '';
-        if (content || sec.id === 'tujuan' || sec.id === 'ruang_lingkup') {
+        const dtAttach = (sec.id === 'data_teknik') ? (d.attachments_data_teknik || []) : [];
+        if (content || dtAttach.length || sec.id === 'tujuan' || sec.id === 'ruang_lingkup') {
           body += `<div class="sec-title"><span class="sec-num">${secNum}.</span>${secLabel}</div>
-<div class="sec-content">${fmtContent(content)}</div>`;
+<div class="sec-content">${fmtContent(content)}${renderAttachments(dtAttach)}</div>`;
           secNum++;
         }
         break;
@@ -822,9 +854,10 @@ table.step-tbl li{margin-bottom:1px}
       // ── Built-in: Formulir (richtext + attachment) ──
       case 'formulir': {
         const formulirContent = steps.formulir || '';
-        if (formulirContent) {
+        const fmAttach = d.attachments_formulir || [];
+        if (formulirContent || fmAttach.length) {
           body += `<div class="sec-title"><span class="sec-num">${secNum}.</span>${secLabel}</div>
-<div class="sec-content">${fmtContent(formulirContent)}</div>`;
+<div class="sec-content">${fmtContent(formulirContent)}${renderAttachments(fmAttach)}</div>`;
           secNum++;
         }
         break;
