@@ -3,9 +3,10 @@ async function renderMasterData(container) {
   container.innerHTML = `<div class="page active" id="page-master-data"></div>`;
 
   try {
-    const [unitsRes, probisRes] = await Promise.all([API.getUnits(), API.getProbis()]);
+    const [unitsRes, probisRes, rmRes] = await Promise.all([API.getUnits(), API.getProbis(), API.getRiskMatrix()]);
     const units = unitsRes.data || [];
     const probis = probisRes.data || [];
+    _riskMatrixData = rmRes.data || { matrix: [], scales: [] };
 
     APP.cache.masterUnits = units;
     APP.cache.masterProbis = probis;
@@ -133,9 +134,11 @@ function switchMDTab(el, contentId) {
   document.querySelectorAll('#page-master-data .tab-content').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   document.getElementById(contentId)?.classList.add('active');
-  // Lazy-load risk matrix when tab is first activated
-  if (contentId === 'md-risiko' && !_riskMatrixData.matrix.length) {
-    loadRiskMatrix();
+  // Render risk matrix from pre-loaded data (no extra API call)
+  if (contentId === 'md-risiko' && document.getElementById('md-risiko-content')?.dataset.rendered !== '1') {
+    renderRiskMatrixTab();
+    const el2 = document.getElementById('md-risiko-content');
+    if (el2) el2.dataset.rendered = '1';
   }
 }
 
@@ -378,14 +381,13 @@ const LEVEL_OPTIONS = ['LOW','LOW TO MODERATE','MODERATE','MODERATE TO HIGH','HI
 const COLOR_OPTIONS = ['#00B050','#92D050','#FFFF00','#FFC000','#FF0000'];
 
 async function loadRiskMatrix() {
-  const el = document.getElementById('md-risiko-content');
-  if (!el) return;
   try {
     const res = await API.getRiskMatrix();
     _riskMatrixData = res.data || { matrix: [], scales: [] };
     renderRiskMatrixTab();
   } catch (e) {
-    el.innerHTML = `<div class="alert alert-danger">${esc(e.message)}</div>`;
+    const el = document.getElementById('md-risiko-content');
+    if (el) el.innerHTML = `<div class="alert alert-danger">${esc(e.message)}</div>`;
   }
 }
 
