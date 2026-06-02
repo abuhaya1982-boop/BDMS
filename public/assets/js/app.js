@@ -425,12 +425,12 @@ table.step-tbl li{margin-bottom:1px}
   .page-container{margin:0;max-width:none}
   .page{box-shadow:none;margin:0;padding:0;min-height:auto}
   .page-break{page-break-before:always}
-  .cover{min-height:auto;height:100vh;padding:15mm 10mm 15mm 20mm;page-break-after:always}
+  .cover{min-height:auto;height:100vh;padding:0;page-break-after:always}
   .page-top{padding-top:0}
   .page-number{display:none}
   .content-wrap-table thead{display:table-header-group}
   .content-wrap-table tfoot{display:table-footer-group}
-  .content-page{padding:15mm 10mm 15mm 20mm;min-height:auto}
+  .content-page{padding:0;min-height:auto}
   /* Prevent section titles from being orphaned at bottom of page */
   .sec-title{page-break-after:avoid;page-break-inside:avoid;break-after:avoid}
   .sub-title{page-break-after:avoid;page-break-inside:avoid;break-after:avoid}
