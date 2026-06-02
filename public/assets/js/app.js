@@ -953,10 +953,12 @@ table.step-tbl li{margin-bottom:1px}
 // ── Primary: native .docx generated server-side (template-accurate, robust) ──
 function downloadDocxNative(btn){
   var id = ${d.id};
+  // Popup is about:blank → root-relative URLs cannot resolve. Use absolute app origin.
+  var apiBase = '${location.origin}';
   var orig = btn ? btn.innerHTML : '';
   if(btn){ btn.disabled=true; btn.innerHTML='\\u23F3 Menyiapkan...'; }
   function restore(){ if(btn){ btn.disabled=false; btn.innerHTML=orig; } }
-  fetch('/api/dokumen/'+id+'/docx',{credentials:'same-origin'})
+  fetch(apiBase+'/api/dokumen/'+id+'/docx',{credentials:'include'})
     .then(function(r){
       if(!r.ok) throw new Error('HTTP '+r.status);
       var fn='${nom}_Rev${rev}.docx';
