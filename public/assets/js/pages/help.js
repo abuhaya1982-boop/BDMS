@@ -44,6 +44,7 @@ async function renderHelp(container) {
             <button class="help-tab active" onclick="switchHelpTab('overview')">Overview</button>
             <button class="help-tab" onclick="switchHelpTab('dokumen')">Dokumen IK</button>
             <button class="help-tab" onclick="switchHelpTab('approval')">Approval</button>
+            <button class="help-tab" onclick="switchHelpTab('siklus')">Siklus & Retensi</button>
             <button class="help-tab" onclick="switchHelpTab('lapangan')">Lapangan</button>
             ${['Super Admin', 'Admin'].includes(role) ? '<button class="help-tab" onclick="switchHelpTab(\'admin\')">Admin</button>' : ''}
           </div>
@@ -97,6 +98,14 @@ async function renderHelp(container) {
             <div class="help-tip-item">
               <div class="help-tip-icon">${icon('shield', 18)}</div>
               <div><strong>Role & Akses</strong><br><span class="help-tip-desc">Akses menu dan aksi disesuaikan otomatis berdasarkan role Anda</span></div>
+            </div>
+            <div class="help-tip-item">
+              <div class="help-tip-icon">${icon('git-compare', 18)}</div>
+              <div><strong>Revisi & Duplikat</strong><br><span class="help-tip-desc">Revisi IK Published tanpa kehilangan nomor, atau duplikat IK sejenis dalam sekali klik</span></div>
+            </div>
+            <div class="help-tip-item">
+              <div class="help-tip-icon">${icon('cloud', 18)}</div>
+              <div><strong>Backup & ZIP</strong><br><span class="help-tip-desc">Cadangkan ke Google Drive dan unduh banyak dokumen sekaligus dalam satu ZIP</span></div>
             </div>
           </div>
         </div>
@@ -218,6 +227,16 @@ function renderHelpTabContent(tab) {
           <div class="help-menu-item"><strong>Laporan & Monitoring</strong> — Analitik compliance, trend, dan KPI</div>
           <div class="help-menu-item"><strong>Audit Trail</strong> — Riwayat semua aktivitas sistem</div>
         </div>
+
+        <h4>${icon('sparkles', 16)} Keunggulan Brantas DMS</h4>
+        <div class="help-menu-list">
+          <div class="help-menu-item"><strong>Template Engine</strong> — Format IK PLN NP terstandar otomatis: section, tabel, dan penomoran dokumen mengikuti standar IMS tanpa perlu menyusun manual di Word.</div>
+          <div class="help-menu-item"><strong>Penomoran Otomatis</strong> — Nomor dokumen <code>IK&lt;KodeUnit&gt;-&lt;Bidang&gt;-&lt;Probis&gt;-&lt;Urut&gt;</code> di-generate sistem & terjamin unik.</div>
+          <div class="help-menu-item"><strong>Approval Berjenjang 3-Tier</strong> — Review (Asman) → Approve (Manager) → Pengesahan (SM), lengkap dengan jejak audit.</div>
+          <div class="help-menu-item"><strong>Siklus Hidup Dokumen</strong> — Duplikat, Revisi berkala, Retensi aktif/inaktif, dan Penarikan dokumen dalam satu sistem.</div>
+          <div class="help-menu-item"><strong>Integrasi Lapangan</strong> — QR Code & Master Equipment menghubungkan IK digital dengan aset fisik.</div>
+          <div class="help-menu-item"><strong>Backup Google Drive</strong> — Salinan dokumen dapat dicadangkan ke cloud untuk keamanan data.</div>
+        </div>
       </div>
     `,
     dokumen: `
@@ -244,6 +263,46 @@ function renderHelpTabContent(tab) {
 
         <h4>${icon('archive', 16)} Arsip Dokumen</h4>
         <p>Dokumen yang sudah Published bisa diarsipkan oleh Senior Manager jika sudah tidak berlaku lagi.</p>
+
+        <h4>${icon('cloud', 16)} Backup Google Drive & Unduh Massal</h4>
+        <ul class="help-list">
+          <li><strong>Backup ke Google Drive</strong> — salinan PDF/dokumen IK dapat dicadangkan ke folder Google Drive unit untuk keamanan data.</li>
+          <li><strong>Unduh massal (ZIP)</strong> — dari Master Data IK, pilih beberapa dokumen lalu unduh sekaligus dalam satu file ZIP.</li>
+          <li><strong>Cetak/PDF format resmi</strong> — tata letak A4 mengikuti template PLN NP, siap untuk diarsipkan fisik maupun digital.</li>
+        </ul>
+      </div>
+    `,
+    siklus: `
+      <div class="help-section">
+        <h4>${icon('copy', 16)} Duplikat IK</h4>
+        <p>Membuat dokumen IK baru dengan menyalin seluruh isi dokumen yang sudah ada — cocok untuk IK sejenis antar unit/equipment.</p>
+        <ol class="help-steps-list">
+          <li>Di Master Data IK, klik tombol <strong>Duplikat</strong> (ikon salin) pada dokumen sumber.</li>
+          <li>Sistem membuat salinan berjudul <em>"… (Salinan)"</em> dengan status <span class="badge badge-draft">Draft</span> dan <strong>nomor dokumen baru</strong> yang di-generate otomatis.</li>
+          <li>Seluruh section (Tujuan, Langkah, SDM, Risiko, dll.) ikut tersalin — tinggal disesuaikan lalu disubmit untuk approval.</li>
+        </ol>
+
+        <h4>${icon('git-compare', 16)} Revisi Berkala</h4>
+        <p>Memutakhirkan dokumen yang sudah <strong>Published</strong> tanpa kehilangan nomor dokumen resmi.</p>
+        <ol class="help-steps-list">
+          <li>Pada dokumen Published, klik <strong>Revisi</strong>. Sistem membuat draft revisi (revisi naik, mis. 00 → 01).</li>
+          <li>Edit draft revisi lalu jalankan kembali alur approval 3-tier seperti biasa.</li>
+          <li>Saat revisi <strong>disahkan</strong>: dokumen lama otomatis diarsipkan dan revisi baru <strong>mengambil alih nomor dokumen resmi</strong> — sehingga nomor IK tetap konsisten sepanjang waktu.</li>
+          <li>Hanya boleh ada <strong>satu</strong> revisi berjalan per dokumen pada satu waktu.</li>
+          <li>Saat pengesahan, sistem menetapkan <strong>jadwal review berikutnya (+2 tahun)</strong> secara otomatis.</li>
+        </ol>
+
+        <h4>${icon('shield-check', 16)} Retensi: Aktif vs Inaktif</h4>
+        <p>Status keberlakuan setiap dokumen ditandai dengan badge retensi:</p>
+        <ul class="help-list">
+          <li><span class="badge badge-success">BERLAKU</span> — dokumen Published, masih aktif digunakan.</li>
+          <li><span class="badge badge-gray">TIDAK BERLAKU</span> — dokumen sudah diarsipkan/digantikan revisi baru.</li>
+          <li><span class="badge badge-danger">DITARIK</span> — dokumen ditarik dari peredaran (tidak boleh digunakan lagi).</li>
+        </ul>
+        <p>Gunakan <strong>filter Retensi</strong> di Master Data IK untuk menampilkan hanya dokumen Berlaku / Tidak Berlaku / Ditarik.</p>
+
+        <h4>${icon('archive-x', 16)} Penarikan Dokumen (Withdraw)</h4>
+        <p>Admin/Super Admin dapat <strong>menarik</strong> dokumen Published atau yang sudah diarsipkan bila ditemukan kesalahan fatal atau sudah tidak relevan. Alasan penarikan dicatat dan dokumen ditandai <span class="badge badge-danger">DITARIK</span> pada kolom retensi.</p>
       </div>
     `,
     approval: `
@@ -368,6 +427,10 @@ function renderFAQ() {
     { q: 'Apakah saya bisa me-review dokumen yang saya buat sendiri?', a: 'Tidak. Sistem mencegah self-review untuk menjaga integritas approval. Dokumen harus direview oleh Asman yang berbeda dari penyusun.' },
     { q: 'Bagaimana QR Code digunakan di lapangan?', a: 'QR Code dicetak dan ditempel di equipment. Teknisi scan dengan HP untuk langsung mengakses IK terkait tanpa perlu login ke komputer.' },
     { q: 'Apa itu Compliance Rate di Laporan?', a: 'Persentase dokumen IK yang dikelola sesuai standar: published tepat waktu, tidak overdue review, dan sesuai format template.' },
+    { q: 'Bagaimana cara membuat IK yang mirip dengan IK yang sudah ada?', a: 'Gunakan fitur Duplikat di Master Data IK. Sistem akan menyalin seluruh isi dokumen menjadi draft baru berjudul "(Salinan)" dengan nomor dokumen baru, lalu Anda tinggal menyesuaikan isinya.' },
+    { q: 'Bagaimana cara merevisi IK yang sudah Published tanpa mengganti nomornya?', a: 'Klik Revisi pada dokumen Published. Sistem membuat draft revisi (revisi naik 00 → 01). Setelah disahkan, dokumen lama diarsipkan dan revisi baru mengambil alih nomor dokumen resmi, sehingga nomor IK tetap konsisten.' },
+    { q: 'Apa arti badge BERLAKU, TIDAK BERLAKU, dan DITARIK?', a: 'BERLAKU = dokumen Published yang masih aktif. TIDAK BERLAKU = sudah diarsipkan atau digantikan revisi baru. DITARIK = ditarik dari peredaran karena kesalahan/tidak relevan. Gunakan filter Retensi untuk menyaringnya.' },
+    { q: 'Apakah dokumen IK dicadangkan ke cloud?', a: 'Ya. Salinan dokumen dapat dicadangkan ke Google Drive unit. Anda juga bisa mengunduh banyak dokumen sekaligus dalam satu file ZIP dari Master Data IK.' },
   ];
 
   return faqs.map((faq, i) => `
