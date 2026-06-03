@@ -6,12 +6,16 @@ const multer = require('multer');
 const { getDB } = require('../db');
 const h = require('../helpers');
 
+// Persistent uploads dir — keep OUTSIDE the git/deploy folder in production (see server.js).
+const UPLOADS_DIR = process.env.BDMS_UPLOADS_DIR
+  ? path.resolve(process.env.BDMS_UPLOADS_DIR)
+  : path.join(__dirname, '../../uploads');
+
 // Configure multer
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, '../../uploads');
-    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-    cb(null, uploadDir);
+    if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    cb(null, UPLOADS_DIR);
   },
   filename: (req, file, cb) => {
     const uniqueName = `${Date.now()}-${Math.random().toString(36).slice(2,8)}${path.extname(file.originalname)}`;
@@ -80,7 +84,7 @@ router.delete('/:id', h.requireAuth, (req, res) => {
     return h.forbidden(res);
   }
   // Remove physical file
-  const filePath = path.join(__dirname, '../../uploads', file.nama_file);
+  const filePath = path.join(UPLOADS_DIR, file.nama_file);
   if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
   db.prepare("DELETE FROM file_uploads WHERE id=?").run(req.params.id);
   h.success(res, null, 'File berhasil dihapus');

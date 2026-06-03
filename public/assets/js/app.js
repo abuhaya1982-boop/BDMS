@@ -497,19 +497,19 @@ table.step-tbl li{margin-bottom:1px}
         <span class="sig-label">Disusun,</span>
         ${d.ttd?.prepared?.data ? `<img src="${d.ttd.prepared.data}" style="max-height:50px;margin:4px auto;display:block">` : ''}
         <div class="sig-name">${penyusunNama}</div>
-        <div class="sig-pos">${penyusunJab || 'Asst. Manager'}</div>
+        <div class="sig-pos">${penyusunJab || 'Supervisor Unit'}</div>
       </td>
       <td>
         <span class="sig-label">Disetujui,</span>
         ${d.ttd?.approved1?.data ? `<img src="${d.ttd.approved1.data}" style="max-height:50px;margin:4px auto;display:block">` : ''}
         <div class="sig-name">${escH(d.approver_nama || '........................')}</div>
-        <div class="sig-pos">Manager Sub-bidang</div>
+        <div class="sig-pos">Manager Unit</div>
       </td>
       <td>
         <span class="sig-label">Disahkan,</span>
         ${d.ttd?.pengesahan?.data ? `<img src="${d.ttd.pengesahan.data}" style="max-height:50px;margin:4px auto;display:block">` : ''}
         <div class="sig-name">${escH(d.pengesahan_nama || '........................')}</div>
-        <div class="sig-pos">Senior Manager</div>
+        <div class="sig-pos">General Manager Unit</div>
       </td>
     </tr>
   </table>

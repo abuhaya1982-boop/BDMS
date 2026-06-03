@@ -6,9 +6,17 @@ const app = express();
 
 const fs = require('fs');
 
-// Ensure database directory exists before anything tries to use it
-const dbDir = path.join(__dirname, 'database');
+// Persistent data dirs — keep OUTSIDE the git/deploy folder in production so that
+// deploys (git clean / fresh checkout) never wipe the DB, sessions, or uploads.
+// On Hostinger set: BDMS_DATA_DIR=/home/<user>/bdms-data  BDMS_UPLOADS_DIR=/home/<user>/bdms-uploads
+const dbDir = process.env.BDMS_DATA_DIR
+  ? path.resolve(process.env.BDMS_DATA_DIR)
+  : path.join(__dirname, 'database');
+const uploadsDir = process.env.BDMS_UPLOADS_DIR
+  ? path.resolve(process.env.BDMS_UPLOADS_DIR)
+  : path.join(__dirname, 'uploads');
 if (!fs.existsSync(dbDir)) fs.mkdirSync(dbDir, { recursive: true });
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
 // Session store (SQLite-backed)
 const SQLiteStore = require('connect-sqlite3')(session);
@@ -47,7 +55,7 @@ app.use(express.static(path.join(__dirname, 'public'), {
   }
 }));
 // Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(uploadsDir));
 
 // API Routes
 app.use('/api/auth', require('./src/routes/auth'));

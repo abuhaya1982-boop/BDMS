@@ -4,7 +4,13 @@ const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
 
-const DB_PATH = path.join(__dirname, '..', 'database', 'bdms.db');
+// Persistent data directory — MUST live OUTSIDE the git/deploy folder in production
+// so that `git clean`/fresh checkout on deploy never wipes the database.
+// Set BDMS_DATA_DIR=/home/<user>/bdms-data on Hostinger. Defaults to ../database for local dev.
+const DATA_DIR = process.env.BDMS_DATA_DIR
+  ? path.resolve(process.env.BDMS_DATA_DIR)
+  : path.join(__dirname, '..', 'database');
+const DB_PATH = path.join(DATA_DIR, 'bdms.db');
 let _db = null;
 
 function getDB() {

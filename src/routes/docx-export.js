@@ -17,7 +17,7 @@ const {
 const A4_W = 11906, A4_H = 16838;
 const MARGIN = { top: 850, right: 567, bottom: 850, left: 1134 }; // T:1.5cm R:1cm B:1.5cm L:2cm
 const CONTENT_W = A4_W - MARGIN.left - MARGIN.right; // 10205 DXA
-const FONT = 'Courier New';
+const FONT = 'Arial';
 const SZ = { xs: 14, sm: 16, md: 20, lg: 22, xl: 28, xxl: 36, title: 44, cover: 56 }; // half-points
 const CLR = { primary: '2A7489', dark: '000000', gray: '808080', headerBg: 'D9E2F3', white: 'FFFFFF' };
 
@@ -365,13 +365,13 @@ function makeHeaderTable(nom, judul, rev, tglTerbit) {
 function buildDocx(doc, data) {
   const { steps, definisi, sdm, tools, material, risiko, formulir,
     dokPendukung, dokReferensi, dokPerizinan, changeHistory,
-    qrBuffer, qrText, attachmentsFormulir, attachmentsDataTeknik } = data;
+    qrBuffer, qrText, attachmentsFormulir, attachmentsDataTeknik, ttd = {} } = data;
 
   const nom = doc.nomor_dokumen || '';
   const judul = doc.judul || '';
   const rev = doc.revisi || '00';
   const penyusunNama = doc.penyusun_nama || doc.owner_nama || '-';
-  const penyusunJab = doc.penyusun_jabatan || 'Asst. Manager';
+  const penyusunJab = doc.penyusun_jabatan || 'Supervisor Unit';
   const approverNama = doc.approver_nama || '........................';
   const pengesahanNama = doc.pengesahan_nama || '........................';
 
@@ -476,18 +476,34 @@ function buildDocx(doc, data) {
 
   coverChildren.push(new Paragraph({ spacing: { before: 600 } }));
 
-  // Signature table
-  function sigBlock(title, name, jabatan) {
-    return [
+  // Signature table — embeds digital signature image (TTD) when available
+  const sigSrc = (v) => (v ? (typeof v === 'string' ? v : v.data) : null);
+  function sigBlock(title, name, jabatan, sigData) {
+    const kids = [
       new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 80, after: 0 }, children: [new TextRun({ text: title, bold: true, font: FONT, size: SZ.md })] }),
-      new Paragraph({ spacing: { before: 1000, after: 0 } }),
-      new Paragraph({
-        alignment: AlignmentType.CENTER, spacing: { after: 40 },
-        border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: CLR.dark } },
-        children: [new TextRun({ text: name, bold: true, font: FONT, size: SZ.md })],
-      }),
-      new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [new TextRun({ text: jabatan, font: FONT, size: SZ.xs, color: CLR.gray })] }),
     ];
+    const parsed = sigData ? parseDataUrl(sigData) : null;
+    if (parsed && /^image\//i.test(parsed.mime)) {
+      const dims = imageDims(parsed.buf, parsed.mime) || { w: 150, h: 70 };
+      let w = dims.w || 150, hgt = dims.h || 70;
+      const MAXW = 150, MAXH = 80;
+      if (w > MAXW) { hgt = Math.round(hgt * MAXW / w); w = MAXW; }
+      if (hgt > MAXH) { w = Math.round(w * MAXH / hgt); hgt = MAXH; }
+      const fmt = /png/i.test(parsed.mime) ? 'png' : /gif/i.test(parsed.mime) ? 'gif' : /bmp/i.test(parsed.mime) ? 'bmp' : 'jpg';
+      try {
+        kids.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120, after: 0 }, children: [new ImageRun({ type: fmt, data: parsed.buf, transformation: { width: w, height: hgt }, altText: { title: 'TTD', description: 'Tanda tangan digital', name: 'ttd' } })] }));
+      } catch { kids.push(new Paragraph({ spacing: { before: 1000, after: 0 } })); }
+    } else {
+      // Reserve signature space when no digital signature present
+      kids.push(new Paragraph({ spacing: { before: 1000, after: 0 } }));
+    }
+    kids.push(new Paragraph({
+      alignment: AlignmentType.CENTER, spacing: { after: 40 },
+      border: { bottom: { style: BorderStyle.SINGLE, size: 1, color: CLR.dark } },
+      children: [new TextRun({ text: name, bold: true, font: FONT, size: SZ.md })],
+    }));
+    kids.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 0 }, children: [new TextRun({ text: jabatan, font: FONT, size: SZ.xs, color: CLR.gray })] }));
+    return kids;
   }
 
   coverChildren.push(new Table({
@@ -500,9 +516,9 @@ function buildDocx(doc, data) {
         hCell('Disahkan oleh', { width: sigCol3, size: SZ.sm }),
       ]}),
       new TableRow({ children: [
-        cell('', { width: sigColW, children: sigBlock('Disusun,', penyusunNama, penyusunJab) }),
-        cell('', { width: sigColW, children: sigBlock('Disetujui,', approverNama, 'Manager Sub-bidang') }),
-        cell('', { width: sigCol3, children: sigBlock('Disahkan,', pengesahanNama, 'Senior Manager') }),
+        cell('', { width: sigColW, children: sigBlock('Disusun,', penyusunNama, penyusunJab, sigSrc(ttd.prepared)) }),
+        cell('', { width: sigColW, children: sigBlock('Disetujui,', approverNama, 'Manager Unit', sigSrc(ttd.approved1)) }),
+        cell('', { width: sigCol3, children: sigBlock('Disahkan,', pengesahanNama, 'General Manager Unit', sigSrc(ttd.pengesahan)) }),
       ]}),
     ],
   }));
@@ -1078,6 +1094,10 @@ router.get('/:id/docx', h.requireAuth, async (req, res) => {
     const attachmentsFormulir = Array.isArray(konten.attachments_formulir) ? konten.attachments_formulir : [];
     const attachmentsDataTeknik = Array.isArray(konten.attachments_data_teknik) ? konten.attachments_data_teknik : [];
 
+    // Digital signatures (TTD) — { prepared, approved1, pengesahan } captured at creation
+    let ttd = {};
+    if (doc.ttd) { try { ttd = JSON.parse(doc.ttd) || {}; } catch {} }
+
     // Generate QR code (matches print-preview QR content)
     let qrBuffer = null, qrText = '';
     try {
@@ -1097,7 +1117,7 @@ router.get('/:id/docx', h.requireAuth, async (req, res) => {
     // Build DOCX
     const docx = buildDocx(
       { ...doc, custom_sections: customSections },
-      { steps, definisi, sdm, tools, material, risiko, formulir, dokPendukung, dokReferensi, dokPerizinan, changeHistory, qrBuffer, qrText, attachmentsFormulir, attachmentsDataTeknik }
+      { steps, definisi, sdm, tools, material, risiko, formulir, dokPendukung, dokReferensi, dokPerizinan, changeHistory, qrBuffer, qrText, attachmentsFormulir, attachmentsDataTeknik, ttd }
     );
 
     const buffer = await Packer.toBuffer(docx);
