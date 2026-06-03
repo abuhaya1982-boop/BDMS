@@ -60,6 +60,27 @@ function hasCreds() {
   return hasOAuth() || hasServiceAccount();
 }
 
+// Diagnosa non-rahasia: untuk memastikan env benar-benar terbaca server.
+// Client ID OAuth BUKAN rahasia (boleh tampil penuh). Secret & refresh token
+// hanya ditampilkan panjang + awalannya, tidak pernah utuh.
+function debugInfo() {
+  const cid = process.env.GDRIVE_OAUTH_CLIENT_ID || '';
+  const sec = process.env.GDRIVE_OAUTH_CLIENT_SECRET || '';
+  const rt = process.env.GDRIVE_OAUTH_REFRESH_TOKEN || '';
+  return {
+    mode: hasOAuth() ? 'oauth' : (hasServiceAccount() ? 'service_account' : 'none'),
+    oauthClientId: cid || null,
+    oauthClientIdLooksValid: /\.apps\.googleusercontent\.com$/.test(cid.trim()),
+    clientIdHasWhitespace: cid !== cid.trim(),
+    clientSecretLen: sec.length,
+    clientSecretPrefix: sec ? sec.slice(0, 7) : null,
+    clientSecretHasWhitespace: sec !== sec.trim(),
+    refreshTokenLen: rt.length,
+    refreshTokenPrefix: rt ? rt.slice(0, 3) : null,
+    refreshTokenHasWhitespace: rt !== rt.trim(),
+  };
+}
+
 function hasFolder() {
   if (process.env.GDRIVE_FOLDER_ID) return true;
   try {
@@ -178,4 +199,4 @@ async function testConnection() {
   };
 }
 
-module.exports = { isConfigured, uploadDocx, hasCreds, hasFolder, testConnection };
+module.exports = { isConfigured, uploadDocx, hasCreds, hasFolder, testConnection, debugInfo };

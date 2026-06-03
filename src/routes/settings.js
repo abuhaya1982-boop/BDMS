@@ -78,7 +78,9 @@ router.post('/', h.requireRole('Admin', 'Super Admin'), (req, res) => {
 router.get('/gdrive-status', h.requireAuth, (req, res) => {
   try {
     const g = require('../gdrive');
-    h.success(res, { hasCreds: g.hasCreds(), hasFolder: g.hasFolder(), configured: g.isConfigured() });
+    const out = { hasCreds: g.hasCreds(), hasFolder: g.hasFolder(), configured: g.isConfigured() };
+    try { out.debug = g.debugInfo(); } catch {}
+    h.success(res, out);
   } catch (e) {
     h.success(res, { hasCreds: false, hasFolder: false, configured: false, error: e.message });
   }
@@ -93,7 +95,9 @@ router.post('/gdrive-test', h.requireRole('Admin', 'Super Admin'), async (req, r
     const r = await g.testConnection();
     h.success(res, r, `Koneksi OK — folder "${r.folderName}"${r.sharedDrive ? ' (Shared Drive)' : ''}`);
   } catch (e) {
-    h.error(res, 'Gagal: ' + e.message);
+    const d = e && e.response && e.response.data;
+    const detail = d && (d.error_description || d.error) ? ` — ${d.error_description || d.error}` : '';
+    h.error(res, 'Gagal: ' + e.message + detail);
   }
 });
 
