@@ -123,6 +123,8 @@ function buildIKHeader(cols) {
 
 function renderIKRows(docs, cols) {
   if (!cols) cols = getIKColumns();
+  const _role = APP.user?.role;
+  const _canDrive = _role === 'Admin' || _role === 'Super Admin';
   return docs.map(d => {
     const cells = cols.map(k => {
       switch (k) {
@@ -145,6 +147,8 @@ function renderIKRows(docs, cols) {
         <div style="display:flex;gap:2px;justify-content:center">
           <button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" onclick="viewDocDetail(${d.id})">${icon('eye', 14)}</button>
           ${d.status === 'Published' ? `<button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" onclick="downloadDocx(${d.id})" title="Download DOCX">${icon('download', 14)}</button>` : ''}
+          ${d.status === 'Published' && d.gdrive_url ? `<a class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" href="${esc(d.gdrive_url)}" target="_blank" rel="noopener" title="Buka di Google Drive">${icon('external-link', 14)}</a>` : ''}
+          ${d.status === 'Published' && _canDrive ? `<button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" onclick="uploadIKToDrive(${d.id})" title="${d.gdrive_url ? 'Unggah ulang ke Google Drive' : 'Unggah ke Google Drive'}">${icon('cloud-upload', 14)}</button>` : ''}
         </div>
       </td>
     `);
@@ -301,6 +305,19 @@ async function viewDocDetail(id) {
   } catch (e) {
     console.error('[MasterIK] viewDocDetail error:', e);
     showToast('Gagal memuat detail dokumen: ' + e.message, 'error');
+  }
+}
+
+// ─── UPLOAD KE GOOGLE DRIVE (manual, dokumen Published) ───
+async function uploadIKToDrive(id) {
+  try {
+    showToast('Mengunggah ke Google Drive…', 'info');
+    const r = await API.uploadDocToDrive(id);
+    showToast('Berhasil diunggah ke Google Drive ✓', 'success');
+    await renderMasterIK(document.getElementById('appContent'));
+    if (r && r.data && r.data.gdrive_url) window.open(r.data.gdrive_url, '_blank', 'noopener');
+  } catch (e) {
+    showToast('Gagal upload ke Drive: ' + e.message, 'error');
   }
 }
 
