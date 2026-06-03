@@ -371,7 +371,7 @@ function buildDocx(doc, data) {
   const judul = doc.judul || '';
   const rev = doc.revisi || '00';
   const penyusunNama = doc.penyusun_nama || doc.owner_nama || '-';
-  const penyusunJab = doc.penyusun_jabatan || 'Supervisor Unit';
+  const penyusunJab = doc.penyusun_jabatan || 'Asman Bagian';
   const approverNama = doc.approver_nama || '........................';
   const pengesahanNama = doc.pengesahan_nama || '........................';
 
@@ -517,8 +517,8 @@ function buildDocx(doc, data) {
       ]}),
       new TableRow({ children: [
         cell('', { width: sigColW, children: sigBlock('Disusun,', penyusunNama, penyusunJab, sigSrc(ttd.prepared)) }),
-        cell('', { width: sigColW, children: sigBlock('Disetujui,', approverNama, 'Manager Unit', sigSrc(ttd.approved1)) }),
-        cell('', { width: sigCol3, children: sigBlock('Disahkan,', pengesahanNama, 'General Manager Unit', sigSrc(ttd.pengesahan)) }),
+        cell('', { width: sigColW, children: sigBlock('Disetujui,', approverNama, 'Manager Sub-bidang', sigSrc(ttd.approved1)) }),
+        cell('', { width: sigCol3, children: sigBlock('Disahkan,', pengesahanNama, 'Senior Manager', sigSrc(ttd.pengesahan)) }),
       ]}),
     ],
   }));
