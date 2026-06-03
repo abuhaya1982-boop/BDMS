@@ -1241,7 +1241,13 @@ function loadCustomSectionData(section, customSections) {
 
 // ─── UPGRADE TEMPLATE ───
 async function upgradeDocTemplate(docId) {
-  if (!confirm('Upgrade template dokumen ini ke versi terbaru?\n\nData yang sudah diisi TIDAK akan hilang, namun struktur seksi akan disesuaikan dengan template terbaru.\n\nLanjutkan?')) return;
+  const ok = await confirmDialog({
+    title: 'Upgrade Template',
+    icon: 'arrow-up-circle',
+    message: 'Upgrade template dokumen ini ke versi terbaru? Data yang sudah diisi <b>tidak akan hilang</b>, namun struktur seksi akan disesuaikan dengan template terbaru.',
+    confirmText: 'Upgrade',
+  });
+  if (!ok) return;
   try {
     const res = await fetch(`api/dokumen/${docId}/upgrade-template`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
     const json = await res.json();

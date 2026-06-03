@@ -408,10 +408,17 @@ function addCustomSection() {
 }
 
 // ─── REMOVE CUSTOM SECTION ───
-function removeCustomSection(idx) {
+async function removeCustomSection(idx) {
   const s = window._tplSectionsEdit[idx];
   if (!s || !s.custom) { showToast('Hanya seksi kustom yang dapat dihapus', 'error'); return; }
-  if (!confirm(`Hapus seksi "${s.label}"?`)) return;
+  const ok = await confirmDialog({
+    title: 'Hapus Seksi',
+    icon: 'trash-2',
+    danger: true,
+    message: `Hapus seksi <b>"${esc(s.label)}"</b> dari template?`,
+    confirmText: 'Hapus',
+  });
+  if (!ok) return;
   window._tplSectionsEdit.splice(idx, 1);
   document.getElementById('sectionConfigList').innerHTML = renderSectionConfigInner(window._tplSectionsEdit);
   renderIcons();
@@ -505,7 +512,13 @@ function typeLabel(type) {
 
 // ─── ACTIVATE / DELETE ───
 async function activateTemplate(id) {
-  if (!confirm('Aktifkan template ini? Template aktif sebelumnya akan menjadi Legacy.')) return;
+  const ok = await confirmDialog({
+    title: 'Aktifkan Template',
+    icon: 'power',
+    message: 'Aktifkan template ini? Template yang aktif sebelumnya akan menjadi <b>Legacy</b>, dan dokumen IK baru akan memakai template ini.',
+    confirmText: 'Aktifkan',
+  });
+  if (!ok) return;
   try {
     await API.updateTemplate(id, { status: 'Aktif' });
     showToast('Template diaktifkan — dokumen IK baru akan menggunakan template ini', 'success');
@@ -515,7 +528,14 @@ async function activateTemplate(id) {
 }
 
 async function deleteTemplate(id) {
-  if (!confirm('Hapus template ini? Aksi ini tidak dapat dibatalkan.')) return;
+  const ok = await confirmDialog({
+    title: 'Hapus Template',
+    icon: 'trash-2',
+    danger: true,
+    message: 'Hapus template ini? <b>Aksi ini tidak dapat dibatalkan.</b>',
+    confirmText: 'Hapus',
+  });
+  if (!ok) return;
   try {
     await API.deleteTemplate(id);
     showToast('Template dihapus', 'success');

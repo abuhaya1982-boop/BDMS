@@ -456,8 +456,15 @@ async function updateUser(id) {
 }
 
 async function resetUserPassword(id) {
-  const pw = prompt('Password baru (min 6 karakter):');
-  if (!pw || pw.length < 6) { showToast('Minimal 6 karakter', 'error'); return; }
+  const pw = await confirmDialog({
+    title: 'Reset Password',
+    icon: 'key-round',
+    message: 'Masukkan password baru untuk pengguna ini (minimal 6 karakter).',
+    input: { label: 'Password baru', type: 'text', placeholder: 'min. 6 karakter', required: true },
+    confirmText: 'Reset Password',
+  });
+  if (pw === null) return;
+  if (pw.length < 6) { showToast('Minimal 6 karakter', 'error'); return; }
   try {
     await API.updateUser(id, { password: pw });
     showToast('Password berhasil direset', 'success');

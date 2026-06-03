@@ -161,7 +161,13 @@ function switchWFTab(el, contentId) {
 // ─── Workflow Actions ───
 
 async function doSubmit(id) {
-  if (!confirm('Submit dokumen ini untuk review Asman?')) return;
+  const ok = await confirmDialog({
+    title: 'Submit untuk Review',
+    icon: 'send',
+    message: 'Dokumen akan diajukan untuk <b>review Asman</b>. Setelah disubmit, dokumen tidak bisa diedit sampai dikembalikan.',
+    confirmText: 'Submit',
+  });
+  if (!ok) return;
   try {
     await API.submitForReview(id);
     showToast('Dokumen disubmit untuk review', 'success');
@@ -171,7 +177,14 @@ async function doSubmit(id) {
 }
 
 async function doReviewApprove(id) {
-  const catatan = prompt('Catatan review (opsional):') || '';
+  const catatan = await confirmDialog({
+    title: 'Review Dokumen (Asman)',
+    icon: 'clipboard-check',
+    message: 'Setujui hasil review dokumen ini? Dokumen akan lanjut ke <b>approval Manager</b>.',
+    input: { label: 'Catatan review (opsional)', placeholder: 'Tambahkan catatan bila perlu…' },
+    confirmText: 'Setujui Review',
+  });
+  if (catatan === null) return;
   try {
     await API.reviewDoc(id, catatan);
     showToast('Dokumen telah di-review ✓ — Lanjut ke approval Manager', 'success');
@@ -181,7 +194,14 @@ async function doReviewApprove(id) {
 }
 
 async function doApproveT1(id) {
-  const catatan = prompt('Catatan approval Manager (opsional):') || '';
+  const catatan = await confirmDialog({
+    title: 'Approval Manager',
+    icon: 'check-circle',
+    message: 'Approve dokumen ini? Dokumen akan lanjut ke <b>pengesahan SM</b>.',
+    input: { label: 'Catatan approval (opsional)', placeholder: 'Tambahkan catatan bila perlu…' },
+    confirmText: 'Approve',
+  });
+  if (catatan === null) return;
   try {
     await API.approveT1(id, catatan);
     showToast('Dokumen di-approve Manager ✓ — Lanjut ke pengesahan SM', 'success');
@@ -191,8 +211,14 @@ async function doApproveT1(id) {
 }
 
 async function doApproveT2(id) {
-  if (!confirm('Sahkan dokumen ini? Dokumen akan dipublish setelah pengesahan.')) return;
-  const catatan = prompt('Catatan pengesahan (opsional):') || '';
+  const catatan = await confirmDialog({
+    title: 'Pengesahan SM',
+    icon: 'badge-check',
+    message: 'Sahkan dokumen ini? Setelah disahkan, dokumen akan <b>diterbitkan (Published)</b> dan otomatis diunggah ke Google Drive bila aktif.',
+    input: { label: 'Catatan pengesahan (opsional)', placeholder: 'Tambahkan catatan bila perlu…' },
+    confirmText: 'Sahkan & Terbitkan',
+  });
+  if (catatan === null) return;
   try {
     await API.approveT2(id, catatan);
     showToast('Dokumen disahkan & dipublish! ✓', 'success');
@@ -212,8 +238,15 @@ async function uploadDocToDrive(id) {
 }
 
 async function doReturnRevisi(id) {
-  const note = prompt('Catatan revisi yang perlu diperbaiki:');
-  if (!note) return;
+  const note = await confirmDialog({
+    title: 'Kembalikan untuk Revisi',
+    icon: 'rotate-ccw',
+    danger: true,
+    message: 'Dokumen akan dikembalikan ke <b>Draft</b> agar penyusun memperbaiki. Jelaskan apa yang perlu direvisi.',
+    input: { label: 'Catatan revisi', placeholder: 'mis. Lengkapi langkah pengukuran…', required: true },
+    confirmText: 'Kembalikan',
+  });
+  if (note === null) return;
   try {
     await API.returnForRevision(id, note);
     showToast('Dokumen dikembalikan ke Draft untuk revisi', 'warning');
@@ -223,8 +256,15 @@ async function doReturnRevisi(id) {
 }
 
 async function doReject(id) {
-  const note = prompt('Alasan penolakan:');
-  if (!note) return;
+  const note = await confirmDialog({
+    title: 'Tolak Dokumen',
+    icon: 'x-circle',
+    danger: true,
+    message: 'Dokumen akan <b>ditolak</b> dan dikembalikan ke Draft. Sebutkan alasan penolakan.',
+    input: { label: 'Alasan penolakan', placeholder: 'mis. Tidak sesuai standar K3…', required: true },
+    confirmText: 'Tolak',
+  });
+  if (note === null) return;
   try {
     await API.rejectDoc(id, note);
     showToast('Dokumen ditolak — kembali ke Draft', 'warning');

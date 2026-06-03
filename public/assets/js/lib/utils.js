@@ -130,11 +130,14 @@ function confirmDialog(opts = {}) {
       cancelText = 'Batal', danger = false, icon: ic = 'help-circle', input = null,
     } = opts;
 
+    const _inStyle = 'width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;box-sizing:border-box';
+    const _field = input && input.type && input.type !== 'textarea'
+      ? `<input id="__confirmDlgInput" type="${input.type}" placeholder="${esc(input.placeholder || '')}" value="${esc(input.value || '')}" style="${_inStyle}">`
+      : `<textarea id="__confirmDlgInput" rows="3" placeholder="${esc(input.placeholder || '')}" style="${_inStyle};resize:vertical">${esc(input.value || '')}</textarea>`;
     const inputHtml = input ? `
       <div style="margin-top:14px">
         ${input.label ? `<label style="display:block;font-size:11.5px;font-weight:600;color:var(--text-secondary);margin-bottom:5px">${esc(input.label)}</label>` : ''}
-        <textarea id="__confirmDlgInput" rows="3" placeholder="${esc(input.placeholder || '')}"
-          style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;resize:vertical;font-family:inherit;box-sizing:border-box">${esc(input.value || '')}</textarea>
+        ${_field}
       </div>` : '';
 
     const body = `
@@ -159,7 +162,15 @@ function confirmDialog(opts = {}) {
     };
 
     openGenericModal(title, body, footer);
-    if (input) setTimeout(() => document.getElementById('__confirmDlgInput')?.focus(), 60);
+    if (input) setTimeout(() => {
+      const el = document.getElementById('__confirmDlgInput');
+      if (!el) return;
+      el.focus();
+      // Enter = konfirmasi untuk input satu baris (bukan textarea)
+      if (input.type && input.type !== 'textarea') {
+        el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); window.__confirmDlgDone && window.__confirmDlgDone(true); } });
+      }
+    }, 60);
   });
 }
 
