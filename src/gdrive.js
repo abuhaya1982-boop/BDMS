@@ -46,12 +46,21 @@ function loadCreds() {
   throw new Error('Kredensial Google belum diatur (GDRIVE_SA_JSON atau GDRIVE_SA_KEY_FILE)');
 }
 
+// Terima ID polos ATAU URL folder (mis. .../folders/<ID>?usp=...) lalu ambil ID-nya.
+function normalizeFolderId(v) {
+  if (!v) return v;
+  const s = String(v).trim();
+  const m = s.match(/\/folders\/([A-Za-z0-9_-]+)/) || s.match(/[?&]id=([A-Za-z0-9_-]+)/);
+  if (m) return m[1];
+  return s.replace(/[?#].*$/, ''); // buang query string bila ada
+}
+
 function folderId() {
-  if (process.env.GDRIVE_FOLDER_ID) return process.env.GDRIVE_FOLDER_ID;
+  if (process.env.GDRIVE_FOLDER_ID) return normalizeFolderId(process.env.GDRIVE_FOLDER_ID);
   try {
     const { getDB } = require('./db');
     const s = getDB().prepare("SELECT value FROM settings WHERE key='gdrive_folder_id'").get();
-    if (s && s.value) return s.value;
+    if (s && s.value) return normalizeFolderId(s.value);
   } catch {}
   throw new Error('Folder Google Drive belum diatur (GDRIVE_FOLDER_ID atau setting gdrive_folder_id)');
 }

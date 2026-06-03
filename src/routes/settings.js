@@ -96,7 +96,12 @@ router.post('/gdrive-test', h.requireRole('Admin', 'Super Admin'), async (req, r
     h.success(res, r, `Koneksi OK — folder "${r.folderName}"${r.sharedDrive ? ' (Shared Drive)' : ''}`);
   } catch (e) {
     const d = e && e.response && e.response.data;
-    const detail = d && (d.error_description || d.error) ? ` — ${d.error_description || d.error}` : '';
+    let detail = '';
+    if (d) {
+      if (typeof d.error === 'string') detail = d.error_description || d.error;
+      else if (d.error && d.error.message) detail = d.error.message;
+    }
+    detail = detail ? ` — ${detail}` : '';
     h.error(res, 'Gagal: ' + e.message + detail);
   }
 });
