@@ -1547,11 +1547,16 @@ function clearTTD(role) {
   if (typeInput) typeInput.value = '';
 }
 
+// Guard against double-click creating duplicate records (shared by saveDraft & submitIK)
+let _saveInFlight = false;
+
 async function saveDraft() {
+  if (_saveInFlight) return; // ignore rapid double-click while a save is running
   const data = collectDocData();
   if (!data.judul) { showToast('Judul IK wajib diisi', 'error'); return; }
   if (!data.unit_id) { showToast('Pilih unit/bidang', 'error'); return; }
   if (!data.probis_id) { showToast('Pilih proses bisnis (Probis)', 'error'); return; }
+  _saveInFlight = true;
   try {
     if (editingDocId) {
       // Server-side auto-detects changes and appends to change_history
@@ -1569,6 +1574,7 @@ async function saveDraft() {
       showToast('Draft tersimpan — No. ' + (res.data?.nomor_dokumen || ''), 'success');
     }
   } catch (e) { console.error('saveDraft error:', e); showToast('Gagal menyimpan: ' + e.message, 'error'); }
+  finally { _saveInFlight = false; }
 }
 
 // ════════════════════════════════════════════
@@ -1597,10 +1603,12 @@ async function reloadActiveTemplate() {
 }
 
 async function submitIK() {
+  if (_saveInFlight) return; // ignore rapid double-click while a save is running
   const data = collectDocData();
   if (!data.judul) { showToast('Judul IK wajib diisi', 'error'); return; }
   if (!data.unit_id) { showToast('Pilih unit/bidang', 'error'); return; }
   if (!data.probis_id) { showToast('Pilih proses bisnis (Probis)', 'error'); return; }
+  _saveInFlight = true;
   try {
     if (editingDocId) {
       // Server auto-records change history
@@ -1613,4 +1621,5 @@ async function submitIK() {
     showToast('Dokumen disubmit untuk review', 'success');
     showPage('master-ik');
   } catch (e) { showToast('Gagal: ' + e.message, 'error'); }
+  finally { _saveInFlight = false; }
 }
