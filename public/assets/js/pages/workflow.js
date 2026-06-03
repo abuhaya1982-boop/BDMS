@@ -114,6 +114,15 @@ function renderWFTable(docs, status) {
         if (canSubmit) actions += `<button class="btn btn-primary btn-xs" onclick="doSubmit(${d.id})" title="Submit untuk review">${icon('upload', 14)} Submit</button>`;
       }
 
+      else if (status === 'Published') {
+        if (d.gdrive_url) {
+          actions += `<a class="btn btn-outline btn-xs" href="${esc(d.gdrive_url)}" target="_blank" rel="noopener" title="Buka di Google Drive">${icon('external-link', 14)} Drive</a>`;
+        }
+        if (isSuperAdmin || isAdmin) {
+          actions += `<button class="btn btn-secondary btn-xs" onclick="uploadDocToDrive(${d.id})" title="${d.gdrive_url ? 'Unggah ulang ke Google Drive' : 'Unggah ke Google Drive'}">${icon('cloud-upload', 14)} ${d.gdrive_url ? 'Re-upload' : 'Upload Drive'}</button>`;
+        }
+      }
+
       // Status badge
       const statusBadge = getStatusBadge(d.status);
 
@@ -190,6 +199,16 @@ async function doApproveT2(id) {
     renderWorkflow(document.getElementById('appContent'));
     loadNotifs();
   } catch (e) { showToast('Gagal: ' + e.message, 'error'); }
+}
+
+async function uploadDocToDrive(id) {
+  try {
+    showToast('Mengunggah ke Google Drive…', 'info');
+    const r = await API.uploadDocToDrive(id);
+    showToast('Berhasil diunggah ke Google Drive ✓', 'success');
+    renderWorkflow(document.getElementById('appContent'));
+    if (r && r.gdrive_url) window.open(r.gdrive_url, '_blank', 'noopener');
+  } catch (e) { showToast('Gagal upload ke Drive: ' + e.message, 'error'); }
 }
 
 async function doReturnRevisi(id) {

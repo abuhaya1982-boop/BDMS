@@ -92,6 +92,7 @@ const API = {
   rejectDoc(dokumenId, catatan = '') { return this.post('workflow/reject', { dokumen_id: dokumenId, catatan }); },
   returnForRevision(dokumenId, catatan = '') { return this.post('workflow/return-revisi', { dokumen_id: dokumenId, catatan }); },
   archiveDoc(dokumenId) { return this.post('workflow/archive', { dokumen_id: dokumenId }); },
+  uploadDocToDrive(dokumenId) { return this.post('workflow/upload-drive', { dokumen_id: dokumenId }); },
 
   // Master Data
   getUnits() { return this.get('units'); },
