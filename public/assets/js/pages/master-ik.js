@@ -12,6 +12,9 @@ const IK_COLUMNS = [
   { key: 'scan_count', label: 'Scan QR', default: false },
 ];
 
+// Pilihan baris untuk aksi bulk (download ZIP / upload Drive). Disimpan per-id.
+const _ikSelected = new Set();
+
 function getIKColumns() {
   try { return JSON.parse(localStorage.getItem('bdms_ik_cols')) || IK_COLUMNS.filter(c=>c.default).map(c=>c.key); }
   catch { return IK_COLUMNS.filter(c=>c.default).map(c=>c.key); }
@@ -37,6 +40,7 @@ async function renderMasterIK(container, docs) {
   }
 
   const activeCols = getIKColumns();
+  _ikSelected.clear();
 
   page.innerHTML = `
     <div class="page-header" style="margin-bottom:8px">
@@ -82,6 +86,13 @@ async function renderMasterIK(container, docs) {
       </div>
     </div>
 
+    <div id="ikBulkBar" style="display:none;align-items:center;gap:8px;margin-bottom:8px;padding:8px 12px;background:var(--primary,#1E3A5F);color:#fff;border-radius:8px;flex-wrap:wrap">
+      <span id="ikBulkCount" style="font-size:12px;font-weight:600">0 dipilih</span>
+      <button class="btn btn-sm" style="background:#fff;color:var(--primary,#1E3A5F)" onclick="bulkDownloadDocx()">${icon('download', 14)} Download ZIP</button>
+      <button class="btn btn-sm" style="background:#fff;color:var(--primary,#1E3A5F)" onclick="bulkUploadDrive()">${icon('cloud-upload', 14)} Upload ke Drive</button>
+      <button class="btn btn-sm" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.5)" onclick="clearIKSelection()">${icon('x', 14)} Batal</button>
+    </div>
+
     <div class="card">
       <div class="table-container" style="overflow-x:auto">
         <table class="ik-master-table" style="font-size:12px">
@@ -92,6 +103,7 @@ async function renderMasterIK(container, docs) {
     </div>
   `;
   renderIcons();
+  updateIKBulkBar();
 
   // Load filter options
   try {
@@ -111,7 +123,8 @@ async function renderMasterIK(container, docs) {
 
 function buildIKHeader(cols) {
   const colMap = Object.fromEntries(IK_COLUMNS.map(c => [c.key, c.label]));
-  return cols.concat(['aksi']).map(k => {
+  const cb = `<th style="width:28px;text-align:center"><input type="checkbox" id="ikSelectAll" title="Pilih semua" onchange="toggleIKSelectAll(this.checked)" style="accent-color:var(--primary)"></th>`;
+  return cb + cols.concat(['aksi']).map(k => {
     if (k === 'aksi') return '<th style="width:50px;text-align:center">Aksi</th>';
     const label = colMap[k] || k;
     let cls = '';
@@ -152,8 +165,90 @@ function renderIKRows(docs, cols) {
         </div>
       </td>
     `);
-    return `<tr>${cells.join('')}</tr>`;
+    const cb = `<td style="text-align:center;width:28px"><input type="checkbox" class="ik-row-cb" data-id="${d.id}" ${_ikSelected.has(d.id) ? 'checked' : ''} onchange="toggleIKSelect(${d.id}, this.checked)" style="accent-color:var(--primary)"></td>`;
+    return `<tr>${cb}${cells.join('')}</tr>`;
   }).join('');
+}
+
+// ─── PILIH BARIS & AKSI BULK ───
+function toggleIKSelect(id, checked) {
+  if (checked) _ikSelected.add(id); else _ikSelected.delete(id);
+  updateIKBulkBar();
+}
+
+function toggleIKSelectAll(checked) {
+  document.querySelectorAll('.ik-row-cb').forEach(cb => {
+    cb.checked = checked;
+    const id = Number(cb.dataset.id);
+    if (checked) _ikSelected.add(id); else _ikSelected.delete(id);
+  });
+  updateIKBulkBar();
+}
+
+function clearIKSelection() {
+  _ikSelected.clear();
+  document.querySelectorAll('.ik-row-cb').forEach(cb => { cb.checked = false; });
+  updateIKBulkBar();
+}
+
+function updateIKBulkBar() {
+  const cnt = _ikSelected.size;
+  const bar = document.getElementById('ikBulkBar');
+  if (bar) bar.style.display = cnt ? 'flex' : 'none';
+  const c = document.getElementById('ikBulkCount');
+  if (c) c.textContent = cnt + ' dipilih';
+  const all = document.querySelectorAll('.ik-row-cb');
+  const sa = document.getElementById('ikSelectAll');
+  if (sa && all.length) {
+    const checkedCount = [...all].filter(cb => cb.checked).length;
+    sa.checked = checkedCount === all.length;
+    sa.indeterminate = checkedCount > 0 && checkedCount < all.length;
+  }
+}
+
+async function bulkDownloadDocx() {
+  const ids = [..._ikSelected];
+  if (!ids.length) return;
+  if (typeof JSZip === 'undefined') { showToast('Pustaka ZIP belum termuat — muat ulang halaman (Ctrl+F5)', 'error'); return; }
+  const docs = APP.cache.allIK || [];
+  showToast(`Menyiapkan ${ids.length} dokumen…`, 'info');
+  const zip = new JSZip();
+  let ok = 0, fail = 0;
+  for (const id of ids) {
+    try {
+      const resp = await fetch(API.getDokumenDocxUrl(id), { credentials: 'include' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const blob = await resp.blob();
+      const d = docs.find(x => x.id === id) || {};
+      const safe = String(d.nomor_dokumen || ('dok-' + id)).replace(/[\\/:*?"<>|]+/g, '_');
+      zip.file(safe + '.docx', blob);
+      ok++;
+    } catch (e) { fail++; }
+  }
+  if (!ok) { showToast('Gagal menyiapkan dokumen', 'error'); return; }
+  const content = await zip.generateAsync({ type: 'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(content);
+  a.download = `IK-dokumen-${new Date().toISOString().slice(0, 10)}.zip`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  showToast(`ZIP siap: ${ok} dokumen${fail ? `, ${fail} gagal` : ''} ✓`, fail ? 'warning' : 'success');
+}
+
+async function bulkUploadDrive() {
+  const ids = [..._ikSelected];
+  if (!ids.length) return;
+  const docs = APP.cache.allIK || [];
+  const pub = ids.filter(id => { const d = docs.find(x => x.id === id); return d && d.status === 'Published'; });
+  const skipped = ids.length - pub.length;
+  if (!pub.length) { showToast('Tidak ada dokumen Published terpilih untuk diupload', 'warning'); return; }
+  let ok = 0, fail = 0;
+  for (let i = 0; i < pub.length; i++) {
+    showToast(`Mengunggah ${i + 1}/${pub.length}…`, 'info');
+    try { await API.uploadDocToDrive(pub[i]); ok++; } catch (e) { fail++; }
+  }
+  showToast(`Upload selesai: ${ok} berhasil${fail ? `, ${fail} gagal` : ''}${skipped ? `, ${skipped} dilewati (bukan Published)` : ''}`, fail ? 'warning' : 'success');
+  await renderMasterIK(document.getElementById('appContent'));
 }
 
 function toggleColPicker() {
@@ -169,6 +264,8 @@ function toggleIKCol(key) {
   const docs = APP.cache.allIK || [];
   document.getElementById('ikTableHead').innerHTML = buildIKHeader(cols);
   document.getElementById('masterIKBody').innerHTML = renderIKRows(docs, cols);
+  renderIcons();
+  updateIKBulkBar();
 }
 
 async function filterMasterIK() {
@@ -184,6 +281,8 @@ async function filterMasterIK() {
   const cols = getIKColumns();
   document.getElementById('masterIKBody').innerHTML = renderIKRows(docs, cols);
   document.getElementById('filterResultInfo').textContent = docs.length + ' dokumen';
+  renderIcons();
+  updateIKBulkBar();
 }
 
 function resetFilterIK() {
