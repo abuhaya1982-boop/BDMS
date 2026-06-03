@@ -1,9 +1,19 @@
 // Brantas DMS — Integrasi Google Drive (auto-upload DOCX saat Publish)
-// Memakai Service Account (cocok untuk Google Workspace + Shared Drive).
-// Konfigurasi via env (disetel di panel Hostinger):
-//   GDRIVE_SA_JSON       = isi penuh file kunci Service Account (JSON, satu baris)
-//      atau GDRIVE_SA_KEY_FILE = path ke file JSON (mis. /home/<user>/bdms-secrets/sa.json)
-//   GDRIVE_FOLDER_ID     = ID folder tujuan di Shared Drive (parent root)
+// Mendukung 2 mode autentikasi (otomatis terdeteksi dari env):
+//
+//  A) OAuth user (untuk Workspace tanpa Shared Drive / bukan admin) — file masuk My Drive akun:
+//       GDRIVE_OAUTH_CLIENT_ID     = Client ID OAuth
+//       GDRIVE_OAUTH_CLIENT_SECRET = Client Secret OAuth
+//       GDRIVE_OAUTH_REFRESH_TOKEN = refresh token (diambil sekali via OAuth Playground)
+//
+//  B) Service Account (untuk Workspace dengan Shared Drive):
+//       GDRIVE_SA_JSON       = isi penuh file kunci Service Account (JSON)
+//          atau GDRIVE_SA_KEY_FILE = path ke file JSON
+//
+//  Wajib (kedua mode):
+//       GDRIVE_FOLDER_ID  = ID folder tujuan (atau diisi lewat Pengaturan → gdrive_folder_id)
+//
+// Bila ketiga env OAuth ada, mode OAuth dipakai lebih dulu; jika tidak, jatuh ke Service Account.
 // Modul ini "graceful": bila belum dikonfigurasi, isConfigured() = false dan
 // pemanggil cukup melewati upload tanpa menggagalkan proses publish.
 const fs = require('fs');
@@ -11,6 +21,19 @@ const { Readable } = require('stream');
 
 const DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const FOLDER_MIME = 'application/vnd.google-apps.folder';
+
+// --- Mode OAuth (user) ---
+function hasOAuth() {
+  return !!(process.env.GDRIVE_OAUTH_CLIENT_ID &&
+    process.env.GDRIVE_OAUTH_CLIENT_SECRET &&
+    process.env.GDRIVE_OAUTH_REFRESH_TOKEN);
+}
+
+// --- Mode Service Account ---
+function hasServiceAccount() {
+  return !!(process.env.GDRIVE_SA_JSON ||
+    (process.env.GDRIVE_SA_KEY_FILE && fs.existsSync(process.env.GDRIVE_SA_KEY_FILE)));
+}
 
 function loadCreds() {
   if (process.env.GDRIVE_SA_JSON) {
@@ -34,8 +57,7 @@ function folderId() {
 }
 
 function hasCreds() {
-  return !!(process.env.GDRIVE_SA_JSON ||
-    (process.env.GDRIVE_SA_KEY_FILE && fs.existsSync(process.env.GDRIVE_SA_KEY_FILE)));
+  return hasOAuth() || hasServiceAccount();
 }
 
 function hasFolder() {
@@ -55,6 +77,19 @@ let _drive = null;
 async function getDrive() {
   if (_drive) return _drive;
   const { google } = require('googleapis'); // lazy: hanya dibutuhkan saat upload aktif
+
+  if (hasOAuth()) {
+    // Mode OAuth user: file masuk My Drive akun yang memberi izin.
+    const oauth2 = new google.auth.OAuth2(
+      process.env.GDRIVE_OAUTH_CLIENT_ID,
+      process.env.GDRIVE_OAUTH_CLIENT_SECRET
+    );
+    oauth2.setCredentials({ refresh_token: process.env.GDRIVE_OAUTH_REFRESH_TOKEN });
+    _drive = google.drive({ version: 'v3', auth: oauth2 });
+    return _drive;
+  }
+
+  // Mode Service Account (Shared Drive).
   const auth = new google.auth.GoogleAuth({
     credentials: loadCreds(),
     scopes: ['https://www.googleapis.com/auth/drive'],
