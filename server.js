@@ -95,5 +95,12 @@ app.use((err, req, res, _next) => {
   res.status(500).json({ success: false, message: err.message || 'Internal server error' });
 });
 
+// Backup DB harian otomatis (in-app, tanpa cron) — catch-up saat startup + tiap 6 jam
+try {
+  require('./src/backup').scheduleDailyBackup();
+} catch (e) {
+  console.warn('[backup] scheduler tidak aktif:', e.message);
+}
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Brantas DMS running on port ${PORT}`));
