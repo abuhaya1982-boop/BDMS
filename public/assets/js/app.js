@@ -655,6 +655,17 @@ table.step-tbl li{margin-bottom:1px}
       { id: 'data_teknik', label: 'Data Teknik Equipment', type: 'richtext' },
     ];
   }
+  // Detail Aktivitas diletakkan SETELAH Metode Pengukuran (standar unit) —
+  // berlaku untuk dokumen lama maupun baru, apa pun urutan template_snapshot.
+  (function reorderAktivitas() {
+    const akt = tplSections.filter(s => s.id && s.id.startsWith('aktivitas_'));
+    if (!akt.length) return;
+    const rest = tplSections.filter(s => !(s.id && s.id.startsWith('aktivitas_')));
+    const mi = rest.findIndex(s => s.id === 'metode_pengukuran');
+    if (mi === -1) return;
+    rest.splice(mi + 1, 0, ...akt);
+    tplSections = rest;
+  })();
 
   // PLN NP Risk Matrix for score/level lookup — from DB or fallback
   const _RM_FALLBACK = {

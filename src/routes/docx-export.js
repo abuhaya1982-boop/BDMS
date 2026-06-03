@@ -359,6 +359,19 @@ function makeHeaderTable(nom, judul, rev, tglTerbit) {
   });
 }
 
+// Pindahkan semua section "aktivitas_*" (Detail Aktivitas) ke tepat setelah
+// "metode_pengukuran". Urutan relatif antar-aktivitas dipertahankan.
+function reorderAktivitas(sections) {
+  const arr = (sections || []).slice();
+  const akt = arr.filter(s => s.id && s.id.startsWith('aktivitas_'));
+  if (!akt.length) return arr;
+  const rest = arr.filter(s => !(s.id && s.id.startsWith('aktivitas_')));
+  const mi = rest.findIndex(s => s.id === 'metode_pengukuran');
+  if (mi === -1) return arr; // tidak ada metode_pengukuran → biarkan apa adanya
+  rest.splice(mi + 1, 0, ...akt);
+  return rest;
+}
+
 // ═══════════════════════════════════════════
 //  BUILD DOCX DOCUMENT
 // ═══════════════════════════════════════════
@@ -398,6 +411,9 @@ function buildDocx(doc, data) {
       { id: 'data_teknik', label: 'Data Teknik Equipment' },
     ];
   }
+  // Detail Aktivitas diletakkan SETELAH Metode Pengukuran (standar unit) —
+  // berlaku untuk dokumen lama maupun baru, apa pun urutan di template_snapshot.
+  tplSections = reorderAktivitas(tplSections);
 
   // ═══ PAGE PROPERTIES (shared) ═══
   const pageProps = {
