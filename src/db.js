@@ -39,6 +39,10 @@ function migrateDB(db) {
     ["ik_documents", "konten", "TEXT"],
     ["ik_documents", "gdrive_url", "TEXT"],
     ["ik_documents", "gdrive_file_id", "TEXT"],
+    ["ik_documents", "revisi_dari", "INTEGER"],
+    ["ik_documents", "superseded_by", "INTEGER"],
+    ["ik_documents", "archived_at", "TEXT"],
+    ["ik_documents", "archived_reason", "TEXT"],
     ["ik_risiko", "residual_kemungkinan", "TEXT"],
     ["ik_risiko", "residual_dampak", "TEXT"],
   ];

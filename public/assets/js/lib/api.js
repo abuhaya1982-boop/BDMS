@@ -79,6 +79,8 @@ const API = {
   updateDokumen(id, data) { return this.put('dokumen/' + id, data); },
   deleteDokumen(id) { return this.del('dokumen/' + id); },
   getRecentDokumen() { return this.get('dokumen/recent'); },
+  duplicateDokumen(id) { return this.post('dokumen/' + id + '/duplicate'); },
+  reviseDokumen(id) { return this.post('dokumen/' + id + '/revisi'); },
 
   // Dashboard
   getDashboard() { return this.get('dashboard'); },
@@ -91,7 +93,8 @@ const API = {
   approveT2(dokumenId, catatan = '') { return this.post('workflow/approve-t2', { dokumen_id: dokumenId, catatan }); },
   rejectDoc(dokumenId, catatan = '') { return this.post('workflow/reject', { dokumen_id: dokumenId, catatan }); },
   returnForRevision(dokumenId, catatan = '') { return this.post('workflow/return-revisi', { dokumen_id: dokumenId, catatan }); },
-  archiveDoc(dokumenId) { return this.post('workflow/archive', { dokumen_id: dokumenId }); },
+  archiveDoc(dokumenId, catatan = '') { return this.post('workflow/archive', { dokumen_id: dokumenId, catatan }); },
+  withdrawDoc(dokumenId, catatan = '') { return this.post('workflow/withdraw', { dokumen_id: dokumenId, catatan }); },
   uploadDocToDrive(dokumenId) { return this.post('workflow/upload-drive', { dokumen_id: dokumenId }); },
 
   // Master Data

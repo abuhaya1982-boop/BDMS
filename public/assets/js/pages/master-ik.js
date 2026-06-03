@@ -4,6 +4,7 @@ const IK_COLUMNS = [
   { key: 'unit_nama', label: 'Unit / Bidang', default: true },
   { key: 'revisi', label: 'Rev', default: true },
   { key: 'status', label: 'Status', default: true },
+  { key: 'retensi', label: 'Retensi', default: true },
   { key: 'tingkat_risiko', label: 'Risiko', default: true },
   { key: 'tanggal_terbit', label: 'Tgl. Terbit', default: true },
   { key: 'owner_nama', label: 'Owner', default: true },
@@ -14,6 +15,23 @@ const IK_COLUMNS = [
 
 // Pilihan baris untuk aksi bulk (download ZIP / upload Drive). Disimpan per-id.
 const _ikSelected = new Set();
+
+// Retensi (masa berlaku) diturunkan dari status + archived_reason.
+// BERLAKU = Published; TIDAK BERLAKU = Archived karena direvisi/diarsip; DITARIK = ditarik (obsolete).
+function retensiInfo(d) {
+  if (d.status === 'Published') return { label: 'BERLAKU', cls: 'badge-success' };
+  if (d.status === 'Archived') {
+    const r = (d.archived_reason || '').toLowerCase();
+    if (r.includes('tarik')) return { label: 'DITARIK', cls: 'badge-danger' };
+    return { label: 'TIDAK BERLAKU', cls: 'badge-gray' };
+  }
+  return null; // Draft/Review/dll → dalam proses, tak relevan
+}
+function retensiBadge(d) {
+  const info = retensiInfo(d);
+  if (!info) return '<span style="color:var(--text-tertiary);font-size:11px">—</span>';
+  return `<span class="badge ${info.cls}" style="font-size:10px;font-weight:700">${info.label}</span>`;
+}
 
 function getIKColumns() {
   try { return JSON.parse(localStorage.getItem('bdms_ik_cols')) || IK_COLUMNS.filter(c=>c.default).map(c=>c.key); }
@@ -74,6 +92,12 @@ async function renderMasterIK(container, docs) {
           <select class="form-control" style="width:120px;font-size:11.5px;padding:4px 8px" id="filterStatus" onchange="filterMasterIK()">
             <option value="">Semua Status</option>
             <option>Draft</option><option>Review</option><option>Approved-T1</option><option>Approved-T2</option><option>Published</option><option>Archived</option>
+          </select>
+          <select class="form-control" style="width:130px;font-size:11.5px;padding:4px 8px" id="filterRetensi" onchange="filterMasterIK()">
+            <option value="">Semua Retensi</option>
+            <option value="berlaku">Hanya Berlaku</option>
+            <option value="tidak">Tidak Berlaku</option>
+            <option value="ditarik">Ditarik</option>
           </select>
           <select class="form-control" style="width:110px;font-size:11.5px;padding:4px 8px" id="filterRisk" onchange="filterMasterIK()">
             <option value="">Semua Risiko</option>
@@ -146,6 +170,7 @@ function renderIKRows(docs, cols) {
         case 'unit_nama': return `<td style="font-size:11.5px">${esc(d.unit_nama || '')}</td>`;
         case 'revisi': return `<td style="text-align:center"><span class="badge badge-blue" style="font-size:10px">Rev ${d.revisi || '00'}</span></td>`;
         case 'status': return `<td>${statusBadge(d.status)}</td>`;
+        case 'retensi': return `<td>${retensiBadge(d)}</td>`;
         case 'tingkat_risiko': return `<td>${riskBadge(d.tingkat_risiko)}</td>`;
         case 'tanggal_terbit': return `<td style="font-size:11px">${d.tanggal_terbit ? formatDate(d.tanggal_terbit) : '<span style="color:var(--text-tertiary)">—</span>'}</td>`;
         case 'owner_nama': return `<td style="font-size:11.5px">${esc(d.owner_nama || '-')}</td>`;
@@ -162,6 +187,9 @@ function renderIKRows(docs, cols) {
           ${d.status === 'Published' ? `<button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" onclick="downloadDocx(${d.id})" title="Download DOCX">${icon('download', 14)}</button>` : ''}
           ${d.status === 'Published' && d.gdrive_url ? `<a class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" href="${esc(d.gdrive_url)}" target="_blank" rel="noopener" title="Buka di Google Drive">${icon('external-link', 14)}</a>` : ''}
           ${d.status === 'Published' && _canDrive ? `<button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" onclick="uploadIKToDrive(${d.id})" title="${d.gdrive_url ? 'Unggah ulang ke Google Drive' : 'Unggah ke Google Drive'}">${icon('cloud-upload', 14)}</button>` : ''}
+          <button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" onclick="duplicateIK(${d.id})" title="Salin sebagai IK baru">${icon('copy', 14)}</button>
+          ${d.status === 'Published' ? `<button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" onclick="reviseIK(${d.id})" title="Buat revisi">${icon('git-compare', 14)}</button>` : ''}
+          ${(d.status === 'Published' || d.status === 'Archived') && _canDrive && !(d.archived_reason || '').toLowerCase().includes('tarik') ? `<button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px;color:var(--danger)" onclick="withdrawIK(${d.id})" title="Tarik dokumen (DITARIK)">${icon('archive-x', 14)}</button>` : ''}
         </div>
       </td>
     `);
@@ -273,10 +301,18 @@ async function filterMasterIK() {
   const status = document.getElementById('filterStatus').value;
   const risk = document.getElementById('filterRisk').value;
   const search = (document.getElementById('filterSearch')?.value || '').toLowerCase();
+  const retensi = document.getElementById('filterRetensi')?.value || '';
   let docs = APP.cache.allIK || [];
   if (unit) docs = docs.filter(d => d.unit_id == unit);
   if (status) docs = docs.filter(d => d.status === status);
   if (risk) docs = docs.filter(d => d.tingkat_risiko === risk);
+  if (retensi) docs = docs.filter(d => {
+    const info = retensiInfo(d);
+    if (retensi === 'berlaku') return info && info.label === 'BERLAKU';
+    if (retensi === 'tidak') return info && info.label === 'TIDAK BERLAKU';
+    if (retensi === 'ditarik') return info && info.label === 'DITARIK';
+    return true;
+  });
   if (search) docs = docs.filter(d => (d.judul + ' ' + d.nomor_dokumen).toLowerCase().includes(search));
   const cols = getIKColumns();
   document.getElementById('masterIKBody').innerHTML = renderIKRows(docs, cols);
@@ -286,7 +322,7 @@ async function filterMasterIK() {
 }
 
 function resetFilterIK() {
-  ['filterUnit','filterStatus','filterRisk'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  ['filterUnit','filterStatus','filterRisk','filterRetensi'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   const s = document.getElementById('filterSearch'); if (s) s.value = '';
   filterMasterIK();
 }
@@ -417,6 +453,46 @@ async function uploadIKToDrive(id) {
     if (r && r.data && r.data.gdrive_url) window.open(r.data.gdrive_url, '_blank', 'noopener');
   } catch (e) {
     showToast('Gagal upload ke Drive: ' + e.message, 'error');
+  }
+}
+
+// ─── DUPLIKAT / REVISI / TARIK ───
+async function duplicateIK(id) {
+  if (!confirm('Salin dokumen ini menjadi IK baru (status Draft, nomor baru)?')) return;
+  try {
+    const r = await API.duplicateDokumen(id);
+    showToast(`Disalin → ${r.data?.nomor_dokumen || 'IK baru'} ✓`, 'success');
+    APP.cache.masterIK = null;
+    await renderMasterIK(document.getElementById('appContent'));
+    if (r.data?.id) editDokumen(r.data.id);
+  } catch (e) {
+    showToast('Gagal menyalin: ' + e.message, 'error');
+  }
+}
+
+async function reviseIK(id) {
+  if (!confirm('Buat draft revisi dari dokumen ini? Versi lama tetap BERLAKU sampai revisi disahkan.')) return;
+  try {
+    const r = await API.reviseDokumen(id);
+    showToast(`Draft revisi ${r.data?.revisi || ''} dibuat ✓`, 'success');
+    APP.cache.masterIK = null;
+    await renderMasterIK(document.getElementById('appContent'));
+    if (r.data?.id) editDokumen(r.data.id);
+  } catch (e) {
+    showToast('Gagal membuat revisi: ' + e.message, 'error');
+  }
+}
+
+async function withdrawIK(id) {
+  const reason = prompt('Tarik dokumen (jadikan DITARIK / obsolete). Alasan (opsional):', '');
+  if (reason === null) return;
+  try {
+    await API.withdrawDoc(id, reason);
+    showToast('Dokumen ditarik (DITARIK) ✓', 'success');
+    APP.cache.masterIK = null;
+    await renderMasterIK(document.getElementById('appContent'));
+  } catch (e) {
+    showToast('Gagal menarik dokumen: ' + e.message, 'error');
   }
 }
 

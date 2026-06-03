@@ -380,4 +380,117 @@ router.delete('/:id', h.requireRole('Admin', 'Super Admin'), (req, res) => {
   } catch (err) { h.error(res, err.message); }
 });
 
+// ── Helper: copy all sub-table rows from one document to another ──
+function cloneSubTables(db, srcId, newId) {
+  // ik_steps
+  for (const s of db.prepare('SELECT * FROM ik_steps WHERE dokumen_id=?').all(srcId)) {
+    db.prepare(`INSERT INTO ik_steps (dokumen_id, step, tujuan, ruang_lingkup,
+      aktivitas_persiapan, aktivitas_pelaksanaan, aktivitas_monitoring, aktivitas_tindak_lanjut,
+      metode_pengukuran, data_teknik, change_history) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(newId, s.step, s.tujuan, s.ruang_lingkup, s.aktivitas_persiapan, s.aktivitas_pelaksanaan,
+        s.aktivitas_monitoring, s.aktivitas_tindak_lanjut, s.metode_pengukuran, s.data_teknik, s.change_history);
+  }
+  for (const d of db.prepare('SELECT * FROM ik_definisi WHERE dokumen_id=?').all(srcId))
+    db.prepare('INSERT INTO ik_definisi (dokumen_id, istilah, penjelasan) VALUES (?,?,?)').run(newId, d.istilah, d.penjelasan);
+  for (const d of db.prepare('SELECT * FROM ik_dokumen_terkait WHERE dokumen_id=?').all(srcId))
+    db.prepare('INSERT INTO ik_dokumen_terkait (dokumen_id, tipe, konten) VALUES (?,?,?)').run(newId, d.tipe, d.konten);
+  for (const r of db.prepare('SELECT * FROM ik_sdm WHERE dokumen_id=?').all(srcId))
+    db.prepare('INSERT INTO ik_sdm (dokumen_id, kompetensi, jumlah, keterangan) VALUES (?,?,?,?)').run(newId, r.kompetensi, r.jumlah, r.keterangan);
+  for (const r of db.prepare('SELECT * FROM ik_tools WHERE dokumen_id=?').all(srcId))
+    db.prepare('INSERT INTO ik_tools (dokumen_id, nama, jumlah, keterangan) VALUES (?,?,?,?)').run(newId, r.nama, r.jumlah, r.keterangan);
+  for (const r of db.prepare('SELECT * FROM ik_material WHERE dokumen_id=?').all(srcId))
+    db.prepare('INSERT INTO ik_material (dokumen_id, nama, jumlah, keterangan) VALUES (?,?,?,?)').run(newId, r.nama, r.jumlah, r.keterangan);
+  for (const r of db.prepare('SELECT * FROM ik_formulir WHERE dokumen_id=?').all(srcId))
+    db.prepare('INSERT INTO ik_formulir (dokumen_id, nomor_form, judul_form) VALUES (?,?,?)').run(newId, r.nomor_form, r.judul_form);
+  for (const r of db.prepare('SELECT * FROM ik_risiko WHERE dokumen_id=?').all(srcId))
+    db.prepare(`INSERT INTO ik_risiko (dokumen_id, risiko, penyebab, dampak, kemungkinan, dampak_level,
+      level_inheren, kontrol_existing, level_residual, mitigasi, residual_kemungkinan, residual_dampak)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+      .run(newId, r.risiko, r.penyebab, r.dampak, r.kemungkinan, r.dampak_level, r.level_inheren,
+        r.kontrol_existing, r.level_residual, r.mitigasi, r.residual_kemungkinan, r.residual_dampak);
+}
+
+// ── Helper: create a new ik_documents row cloned from source, return new id+nomor ──
+// opts: { judul, revisi, status, nomor (optional explicit), revisi_dari }
+function createClonedDocument(db, src, userId, opts) {
+  const unit = db.prepare('SELECT kode_dokumen FROM units WHERE id=?').get(src.unit_id);
+  const prob = db.prepare('SELECT nomor FROM probis WHERE id=?').get(src.probis_id);
+  let nomor = opts.nomor;
+  if (!nomor) {
+    db.prepare(`INSERT INTO doc_number_sequences (unit_id, probis_id, last_sequence)
+      VALUES (?,?,1) ON CONFLICT(unit_id, probis_id) DO UPDATE SET last_sequence=last_sequence+1`)
+      .run(src.unit_id, src.probis_id);
+    const seqRow = db.prepare('SELECT last_sequence FROM doc_number_sequences WHERE unit_id=? AND probis_id=?').get(src.unit_id, src.probis_id);
+    nomor = h.generateDocNumber(unit ? unit.kode_dokumen : 'IK', prob ? prob.nomor : '00', seqRow.last_sequence);
+  }
+  const result = db.prepare(`INSERT INTO ik_documents
+    (judul, nomor_dokumen, unit_id, probis_id, revisi, status, tingkat_risiko, owner_id,
+     template_id, template_snapshot, template_versi,
+     tanggal_ditetapkan, tanggal_diperbarui, penyusun_nama, penyusun_jabatan,
+     approver_id, pengesahan_id, ttd, custom_sections, konten, revisi_dari)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(
+      opts.judul, nomor, src.unit_id, src.probis_id,
+      opts.revisi, opts.status || 'Draft', src.tingkat_risiko || 'Rendah', userId,
+      src.template_id, src.template_snapshot, src.template_versi,
+      src.tanggal_ditetapkan || null, null,
+      src.penyusun_nama || null, src.penyusun_jabatan || null,
+      src.approver_id || null, src.pengesahan_id || null,
+      src.ttd || null, src.custom_sections || null, src.konten || null,
+      opts.revisi_dari || null
+    );
+  const newId = result.lastInsertRowid;
+  cloneSubTables(db, src.id, newId);
+  return { id: newId, nomor_dokumen: nomor };
+}
+
+function bumpRevisi(rev) {
+  const n = parseInt(rev, 10);
+  if (Number.isNaN(n)) return '01';
+  return String(n + 1).padStart(2, '0');
+}
+
+// POST /:id/duplicate — Salin dokumen sebagai IK baru (nomor baru, revisi 00, Draft)
+router.post('/:id/duplicate', h.requireAuth, (req, res) => {
+  try {
+    const db = getDB();
+    const src = db.prepare('SELECT * FROM ik_documents WHERE id=?').get(req.params.id);
+    if (!src) return h.notFound(res, 'Dokumen sumber tidak ditemukan');
+    const userId = req.session.user_id;
+    const out = createClonedDocument(db, src, userId, {
+      judul: (src.judul || 'Tanpa Judul') + ' (Salinan)',
+      revisi: '00', status: 'Draft',
+    });
+    h.logAudit(req, 'DUPLICATE_DOCUMENT', `Dokumen ${src.nomor_dokumen} disalin menjadi ${out.nomor_dokumen}`, 'dokumen');
+    h.created(res, out);
+  } catch (err) { h.error(res, err.message); }
+});
+
+// POST /:id/revisi — Buat draft revisi dari dokumen Published
+router.post('/:id/revisi', h.requireAuth, (req, res) => {
+  try {
+    const db = getDB();
+    const src = db.prepare('SELECT * FROM ik_documents WHERE id=?').get(req.params.id);
+    if (!src) return h.notFound(res, 'Dokumen tidak ditemukan');
+    if (src.status !== 'Published') return h.error(res, 'Hanya dokumen berstatus Published yang bisa direvisi');
+
+    // Cegah revisi ganda yang masih berjalan
+    const open = db.prepare(`SELECT id, nomor_dokumen FROM ik_documents
+      WHERE revisi_dari=? AND status NOT IN ('Archived','Rejected','Published')`).get(src.id);
+    if (open) return h.error(res, `Sudah ada draft revisi berjalan (${open.nomor_dokumen}). Selesaikan atau hapus dulu.`);
+
+    const userId = req.session.user_id;
+    const newRev = bumpRevisi(src.revisi);
+    // Nomor sementara unik & mudah dikenali; akan diganti ke nomor kanonik saat publish.
+    const tempNomor = `${src.nomor_dokumen} (Rev ${newRev} draft)`;
+    const out = createClonedDocument(db, src, userId, {
+      judul: src.judul,
+      revisi: newRev, status: 'Draft',
+      nomor: tempNomor, revisi_dari: src.id,
+    });
+    h.logAudit(req, 'REVISE_DOCUMENT', `Draft revisi ${newRev} dibuat dari ${src.nomor_dokumen}`, 'dokumen');
+    h.created(res, { ...out, revisi: newRev, parent_nomor: src.nomor_dokumen });
+  } catch (err) { h.error(res, err.message); }
+});
+
 module.exports = router;

@@ -126,8 +126,28 @@ router.post('/approve-t2', h.requireAuth, (req, res) => {
     if (!doc) return h.notFound(res);
     if (doc.status !== 'Approved-T2') return h.error(res, 'Dokumen harus berstatus Approved-T2');
 
-    db.prepare("UPDATE ik_documents SET status='Published', tanggal_terbit=datetime('now','localtime'), updated_at=datetime('now','localtime') WHERE id=?").run(dokumen_id);
+    db.prepare("UPDATE ik_documents SET status='Published', tanggal_terbit=datetime('now','localtime'), review_due=date('now','localtime','+2 years'), updated_at=datetime('now','localtime') WHERE id=?").run(dokumen_id);
     addApproval(db, dokumen_id, userId, 'Approve-SM', catatan);
+
+    // Bila ini draft revisi: ambil alih nomor kanonik & arsipkan versi lama (superseded).
+    if (doc.revisi_dari) {
+      const parent = db.prepare('SELECT * FROM ik_documents WHERE id=?').get(doc.revisi_dari);
+      if (parent && parent.status === 'Published') {
+        const canonical = parent.nomor_dokumen;
+        let archivedNomor = `${canonical} -R${parent.revisi}`;
+        let attempt = 0;
+        while (db.prepare('SELECT 1 FROM ik_documents WHERE nomor_dokumen=? AND id!=?').get(archivedNomor, parent.id)) {
+          attempt++; archivedNomor = `${canonical} -R${parent.revisi}.${attempt}`;
+        }
+        // Arsipkan parent (membebaskan nomor kanonik) lalu pindahkan ke draft revisi.
+        db.prepare("UPDATE ik_documents SET nomor_dokumen=?, status='Archived', superseded_by=?, archived_reason='Direvisi', archived_at=datetime('now','localtime'), updated_at=datetime('now','localtime') WHERE id=?")
+          .run(archivedNomor, dokumen_id, parent.id);
+        db.prepare("UPDATE ik_documents SET nomor_dokumen=? WHERE id=?").run(canonical, dokumen_id);
+        doc.nomor_dokumen = canonical;
+        h.logAudit(req, 'SUPERSEDE_DOCUMENT', `Versi lama ${archivedNomor} digantikan revisi ${doc.revisi} (${canonical})`, 'workflow');
+      }
+    }
+
     h.logAudit(req, 'APPROVE_T2', `Dokumen ${doc.nomor_dokumen} diapprove SM & diterbitkan`, 'workflow');
     h.notify(doc.owner_id, 'Dokumen Diterbitkan', `${doc.judul} telah diterbitkan`);
     // Auto-upload DOCX final ke Google Drive (non-blocking) — respons publish tidak menunggu.
@@ -189,10 +209,32 @@ router.post('/archive', h.requireAuth, (req, res) => {
     if (!doc) return h.notFound(res);
     if (doc.status !== 'Published') return h.error(res, 'Hanya dokumen Published yang bisa diarsipkan');
 
-    db.prepare("UPDATE ik_documents SET status='Archived', updated_at=datetime('now','localtime') WHERE id=?").run(dokumen_id);
+    db.prepare("UPDATE ik_documents SET status='Archived', archived_reason=?, archived_at=datetime('now','localtime'), updated_at=datetime('now','localtime') WHERE id=?")
+      .run(catatan || 'Diarsipkan', dokumen_id);
     addApproval(db, dokumen_id, userId, 'Archive', catatan);
     h.logAudit(req, 'ARCHIVE_DOCUMENT', `Dokumen ${doc.nomor_dokumen} diarsipkan`, 'workflow');
     h.success(res, { status: 'Archived' }, 'Dokumen berhasil diarsipkan');
+  } catch (err) { h.error(res, err.message); }
+});
+
+// POST /withdraw — Tarik dokumen (Published/Archived → Archived, ditandai DITARIK)
+router.post('/withdraw', h.requireRole('Admin', 'Super Admin'), (req, res) => {
+  try {
+    const db = getDB();
+    const userId = req.session.user_id;
+    const { dokumen_id, catatan } = req.body;
+    if (!dokumen_id) return h.error(res, 'dokumen_id wajib');
+
+    const doc = db.prepare('SELECT * FROM ik_documents WHERE id=?').get(dokumen_id);
+    if (!doc) return h.notFound(res);
+    if (!['Published', 'Archived'].includes(doc.status)) return h.error(res, 'Hanya dokumen Published/Archived yang bisa ditarik');
+
+    const reason = catatan ? `Ditarik: ${catatan}` : 'Ditarik';
+    db.prepare("UPDATE ik_documents SET status='Archived', archived_reason=?, archived_at=datetime('now','localtime'), updated_at=datetime('now','localtime') WHERE id=?")
+      .run(reason, dokumen_id);
+    addApproval(db, dokumen_id, userId, 'Withdraw', catatan);
+    h.logAudit(req, 'WITHDRAW_DOCUMENT', `Dokumen ${doc.nomor_dokumen} ditarik (obsolete)`, 'workflow');
+    h.success(res, { status: 'Archived' }, 'Dokumen ditarik (DITARIK)');
   } catch (err) { h.error(res, err.message); }
 });
 
