@@ -74,6 +74,29 @@ router.post('/', h.requireRole('Admin', 'Super Admin'), (req, res) => {
   h.success(res, getSettingsFlat(), 'Pengaturan disimpan');
 });
 
+// GET /api/settings/gdrive-status — status konfigurasi Google Drive
+router.get('/gdrive-status', h.requireAuth, (req, res) => {
+  try {
+    const g = require('../gdrive');
+    h.success(res, { hasCreds: g.hasCreds(), hasFolder: g.hasFolder(), configured: g.isConfigured() });
+  } catch (e) {
+    h.success(res, { hasCreds: false, hasFolder: false, configured: false, error: e.message });
+  }
+});
+
+// POST /api/settings/gdrive-test — uji koneksi & akses folder Drive
+router.post('/gdrive-test', h.requireRole('Admin', 'Super Admin'), async (req, res) => {
+  try {
+    const g = require('../gdrive');
+    if (!g.hasCreds()) return h.error(res, 'Kredensial Service Account belum diatur (env GDRIVE_SA_JSON / GDRIVE_SA_KEY_FILE)');
+    if (!g.hasFolder()) return h.error(res, 'Folder ID belum diisi');
+    const r = await g.testConnection();
+    h.success(res, r, `Koneksi OK — folder "${r.folderName}"${r.sharedDrive ? ' (Shared Drive)' : ''}`);
+  } catch (e) {
+    h.error(res, 'Gagal: ' + e.message);
+  }
+});
+
 // POST /api/settings/reset-db — reset database
 router.post('/reset-db', h.requireRole('Super Admin'), (req, res) => {
   try {

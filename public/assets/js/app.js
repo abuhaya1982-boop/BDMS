@@ -145,11 +145,13 @@ async function previewDokumenFull(id, mode) {
     let cloudBaseUrl = '';
     try { const settRes = await API.getSettings(); cloudBaseUrl = settRes.data?.cloud_base_url || ''; } catch(e) { /* ignore */ }
 
-    const gdrivePath = cloudBaseUrl
-      ? `${cloudBaseUrl.replace(/\/+$/,'')}/${unit.replace(/\s+/g,'_')}/${d.nomor_dokumen}/`
-      : `G:/IMS_UP_Brantas/Instruksi_Kerja/${unit.replace(/\s+/g,'_')}/${d.nomor_dokumen}/`;
+    const gdrivePath = d.gdrive_url
+      ? d.gdrive_url
+      : (cloudBaseUrl
+        ? `${cloudBaseUrl.replace(/\/+$/,'')}/${unit.replace(/\s+/g,'_')}/${d.nomor_dokumen}/`
+        : `G:/IMS_UP_Brantas/Instruksi_Kerja/${unit.replace(/\s+/g,'_')}/${d.nomor_dokumen}/`);
 
-    const qrData = cloudBaseUrl ? `${gdrivePath}` : `BDMS|${d.nomor_dokumen}|Rev${d.revisi||'00'}|${unit}`;
+    const qrData = d.gdrive_url ? d.gdrive_url : (cloudBaseUrl ? `${gdrivePath}` : `BDMS|${d.nomor_dokumen}|Rev${d.revisi||'00'}|${unit}`);
     const qrSvg = generateQRCodeSVG(qrData, 150);
 
     const konten = d.konten || {};

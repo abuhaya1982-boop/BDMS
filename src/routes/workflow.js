@@ -3,6 +3,32 @@ const router = require('express').Router();
 const { getDB } = require('../db');
 const h = require('../helpers');
 
+// Auto-upload DOCX ke Google Drive saat dokumen di-Publish (fire-and-forget).
+// Tidak menggagalkan proses publish bila Drive belum dikonfigurasi / gagal.
+async function uploadPublishedToDrive(dokumenId) {
+  let gdrive, docxExport;
+  try { gdrive = require('../gdrive'); } catch { return; }
+  if (!gdrive.isConfigured()) return; // diam-diam dilewati bila belum disetel
+  try { docxExport = require('./docx-export'); } catch { return; }
+  if (typeof docxExport.generateDocxBuffer !== 'function') return;
+
+  try {
+    const result = await docxExport.generateDocxBuffer(dokumenId);
+    if (!result) return;
+    const { buffer, doc, filename } = result;
+    const up = await gdrive.uploadDocx({
+      buffer, filename,
+      unitName: (doc.unit_nama || '').replace(/\s+/g, '_'),
+      nomor: doc.nomor_dokumen,
+    });
+    getDB().prepare("UPDATE ik_documents SET gdrive_url=?, gdrive_file_id=? WHERE id=?")
+      .run(up.link, up.id, dokumenId);
+    console.log('[gdrive] terupload:', filename, '→', up.link);
+  } catch (e) {
+    console.warn('[gdrive] upload gagal untuk dokumen', dokumenId, ':', e.message);
+  }
+}
+
 // GET / — List workflow documents
 router.get('/', h.requireAuth, (req, res) => {
   try {
@@ -104,6 +130,8 @@ router.post('/approve-t2', h.requireAuth, (req, res) => {
     addApproval(db, dokumen_id, userId, 'Approve-SM', catatan);
     h.logAudit(req, 'APPROVE_T2', `Dokumen ${doc.nomor_dokumen} diapprove SM & diterbitkan`, 'workflow');
     h.notify(doc.owner_id, 'Dokumen Diterbitkan', `${doc.judul} telah diterbitkan`);
+    // Auto-upload DOCX final ke Google Drive (non-blocking) — respons publish tidak menunggu.
+    uploadPublishedToDrive(dokumen_id).catch(() => {});
     h.success(res, { status: 'Published' }, 'Dokumen berhasil diterbitkan');
   } catch (err) { h.error(res, err.message); }
 });
@@ -166,6 +194,32 @@ router.post('/archive', h.requireAuth, (req, res) => {
     h.logAudit(req, 'ARCHIVE_DOCUMENT', `Dokumen ${doc.nomor_dokumen} diarsipkan`, 'workflow');
     h.success(res, { status: 'Archived' }, 'Dokumen berhasil diarsipkan');
   } catch (err) { h.error(res, err.message); }
+});
+
+// POST /upload-drive — unggah ulang DOCX dokumen ke Google Drive secara manual
+// (mis. untuk dokumen yang sudah Published sebelum fitur ini aktif).
+router.post('/upload-drive', h.requireAuth, async (req, res) => {
+  try {
+    const { dokumen_id } = req.body;
+    if (!dokumen_id) return h.error(res, 'dokumen_id wajib');
+    const gdrive = require('../gdrive');
+    if (!gdrive.isConfigured()) return h.error(res, 'Google Drive belum dikonfigurasi (kredensial / Folder ID)');
+    const docxExport = require('./docx-export');
+    const result = await docxExport.generateDocxBuffer(dokumen_id);
+    if (!result) return h.notFound(res);
+    const { buffer, doc, filename } = result;
+    const up = await gdrive.uploadDocx({
+      buffer, filename,
+      unitName: (doc.unit_nama || '').replace(/\s+/g, '_'),
+      nomor: doc.nomor_dokumen,
+    });
+    getDB().prepare("UPDATE ik_documents SET gdrive_url=?, gdrive_file_id=? WHERE id=?")
+      .run(up.link, up.id, dokumen_id);
+    h.logAudit(req, 'UPLOAD_DRIVE', `Dokumen ${doc.nomor_dokumen} diunggah ke Google Drive`, 'workflow');
+    h.success(res, { gdrive_url: up.link }, 'Berhasil diupload ke Google Drive');
+  } catch (e) {
+    h.error(res, 'Gagal upload ke Drive: ' + e.message);
+  }
 });
 
 module.exports = router;

@@ -37,6 +37,8 @@ function migrateDB(db) {
     ["ik_documents", "ttd", "TEXT"],
     ["ik_documents", "custom_sections", "TEXT"],
     ["ik_documents", "konten", "TEXT"],
+    ["ik_documents", "gdrive_url", "TEXT"],
+    ["ik_documents", "gdrive_file_id", "TEXT"],
     ["ik_risiko", "residual_kemungkinan", "TEXT"],
     ["ik_risiko", "residual_dampak", "TEXT"],
   ];

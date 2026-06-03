@@ -87,6 +87,25 @@ async function renderPengaturan(container) {
 
       <div class="card" style="margin-top:12px">
         <div class="card-header">
+          <div class="card-title">${icon('upload-cloud', 14)} Auto-Upload ke Google Drive</div>
+        </div>
+        <div class="card-body">
+          <div class="alert alert-info" style="margin-bottom:14px"><div class="alert-icon">${icon('info', 14)}</div><div style="font-size:12px">Saat dokumen <strong>di-Publish</strong>, file <strong>DOCX</strong> otomatis diunggah ke Google Drive (struktur <code>Folder/Unit/Nomor/</code>) dan <strong>QR Code</strong> akan menunjuk ke file tersebut. Membutuhkan <strong>Service Account</strong> (diatur di server via env <code>GDRIVE_SA_JSON</code>) dan <strong>Folder ID</strong> di bawah ini yang sudah di-<em>share</em> ke email Service Account.</div></div>
+          <div class="form-group" style="margin-bottom:14px">
+            <label class="form-label">Google Drive Folder ID (Shared Drive)</label>
+            <input type="text" class="form-control mono" id="set-gdrive-folder" value="${esc(s.gdrive_folder_id || '')}" placeholder="mis. 1AbCdEfGhIjKlMnOpQrStUvWxYz" style="width:100%">
+            <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Ambil dari URL folder: <code>drive.google.com/drive/folders/<strong>[ID]</strong></code></div>
+          </div>
+          <div id="gdrive-test-result" style="font-size:12px;margin-bottom:12px"></div>
+          <div style="text-align:right;display:flex;gap:8px;justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="testGdriveConnection()">${icon('plug', 14)} Test Koneksi</button>
+            <button class="btn btn-primary" onclick="saveGdriveSettings()">${icon('save', 14)} Simpan Folder ID</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <div class="card-header">
           <div class="card-title">${icon('copy', 14)} URL Backup Tambahan</div>
           <button class="btn btn-secondary btn-sm" onclick="addBackupUrl()">${icon('plus', 14)} Tambah</button>
         </div>
@@ -428,6 +447,31 @@ async function saveCloudSettings() {
     updateCloudPreview();
     showToast('Cloud storage utama disimpan. QR Code dokumen akan menggunakan link ini.', 'success');
   } catch (e) { showToast('Gagal: ' + e.message, 'error'); }
+}
+
+async function saveGdriveSettings() {
+  const folderId = document.getElementById('set-gdrive-folder')?.value?.trim() || '';
+  try {
+    await API.saveSettings({ gdrive_folder_id: folderId });
+    showToast('Folder ID Google Drive disimpan.', 'success');
+  } catch (e) { showToast('Gagal: ' + e.message, 'error'); }
+}
+
+async function testGdriveConnection() {
+  const el = document.getElementById('gdrive-test-result');
+  if (el) el.innerHTML = '<span style="color:var(--text-tertiary)">Menguji koneksi…</span>';
+  try {
+    // Simpan dulu folder ID terkini agar test memakai nilai terbaru
+    const folderId = document.getElementById('set-gdrive-folder')?.value?.trim() || '';
+    await API.saveSettings({ gdrive_folder_id: folderId });
+    const res = await API.post('settings/gdrive-test', {});
+    const d = res.data || {};
+    if (el) el.innerHTML = `<span style="color:var(--success)">✓ ${esc(res.message || 'Koneksi OK')}</span>`;
+    showToast(res.message || 'Koneksi Google Drive OK', 'success');
+  } catch (e) {
+    if (el) el.innerHTML = `<span style="color:var(--danger)">✗ ${esc(e.message)}</span>`;
+    showToast('Gagal: ' + e.message, 'error');
+  }
 }
 
 async function saveBackupUrls() {

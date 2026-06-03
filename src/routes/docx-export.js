@@ -1050,9 +1050,9 @@ function buildDocx(doc, data) {
   });
 }
 
-// ═══ ROUTE: GET /api/dokumen/:id/docx ═══
-router.get('/:id/docx', h.requireAuth, async (req, res) => {
-  try {
+// Reusable: gather data + build DOCX buffer for a document id.
+// Returns { buffer, doc, filename } or null if the document does not exist.
+async function generateDocxBuffer(id) {
     resetRmCache(); // refresh risk matrix from DB for this export
     const db = getDB();
     const doc = db.prepare(`
@@ -1063,10 +1063,8 @@ router.get('/:id/docx', h.requireAuth, async (req, res) => {
       LEFT JOIN users appr ON appr.id=d.approver_id
       LEFT JOIN users peng ON peng.id=d.pengesahan_id
       WHERE d.id=?
-    `).get(req.params.id);
-    if (!doc) return h.notFound(res, 'Dokumen tidak ditemukan');
-
-    const id = req.params.id;
+    `).get(id);
+    if (!doc) return null;
 
     // Load steps
     const stepRows = db.prepare('SELECT * FROM ik_steps WHERE dokumen_id=? ORDER BY step').all(id);
@@ -1120,7 +1118,9 @@ router.get('/:id/docx', h.requireAuth, async (req, res) => {
       let cloudBase = '';
       try { const s = db.prepare("SELECT value FROM settings WHERE key='cloud_base_url'").get(); cloudBase = (s && s.value) || ''; } catch {}
       const unitName = doc.unit_nama || '';
-      if (cloudBase) {
+      if (doc.gdrive_url) {
+        qrText = doc.gdrive_url; // link file nyata di Google Drive
+      } else if (cloudBase) {
         qrText = `${cloudBase.replace(/\/+$/,'')}/${unitName.replace(/\s+/g,'_')}/${doc.nomor_dokumen}/`;
       } else {
         qrText = `BDMS|${doc.nomor_dokumen}|Rev${doc.revisi||'00'}|${unitName}`;
@@ -1138,15 +1138,23 @@ router.get('/:id/docx', h.requireAuth, async (req, res) => {
 
     const buffer = await Packer.toBuffer(docx);
     const filename = `${doc.nomor_dokumen || 'IK'}_Rev${doc.revisi || '00'}.docx`;
+    return { buffer, doc, filename };
+}
 
+// ═══ ROUTE: GET /api/dokumen/:id/docx ═══
+router.get('/:id/docx', h.requireAuth, async (req, res) => {
+  try {
+    const result = await generateDocxBuffer(req.params.id);
+    if (!result) return h.notFound(res, 'Dokumen tidak ditemukan');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Content-Length', buffer.length);
-    res.send(buffer);
+    res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+    res.setHeader('Content-Length', result.buffer.length);
+    res.send(result.buffer);
   } catch (err) {
     console.error('DOCX export error:', err);
     h.error(res, 'Gagal generate DOCX: ' + err.message, 500);
   }
 });
 
+router.generateDocxBuffer = generateDocxBuffer;
 module.exports = router;
