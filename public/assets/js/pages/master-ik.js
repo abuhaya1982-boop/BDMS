@@ -458,7 +458,13 @@ async function uploadIKToDrive(id) {
 
 // ─── DUPLIKAT / REVISI / TARIK ───
 async function duplicateIK(id) {
-  if (!confirm('Salin dokumen ini menjadi IK baru (status Draft, nomor baru)?')) return;
+  const ok = await confirmDialog({
+    title: 'Salin sebagai IK Baru',
+    icon: 'copy',
+    message: 'Dokumen ini akan disalin menjadi <b>IK baru</b> dengan <b>nomor baru</b>, revisi <b>00</b>, dan status <b>Draft</b>. Anda akan langsung diarahkan ke editor.',
+    confirmText: 'Salin',
+  });
+  if (!ok) return;
   try {
     const r = await API.duplicateDokumen(id);
     showToast(`Disalin → ${r.data?.nomor_dokumen || 'IK baru'} ✓`, 'success');
@@ -471,7 +477,13 @@ async function duplicateIK(id) {
 }
 
 async function reviseIK(id) {
-  if (!confirm('Buat draft revisi dari dokumen ini? Versi lama tetap BERLAKU sampai revisi disahkan.')) return;
+  const ok = await confirmDialog({
+    title: 'Buat Revisi',
+    icon: 'git-compare',
+    message: 'Draft revisi baru akan dibuat dari dokumen ini. <b>Versi lama tetap BERLAKU</b> sampai revisi disahkan SM. Setelah sah, nomor dokumen tetap sama dan versi lama otomatis diarsipkan.',
+    confirmText: 'Buat Revisi',
+  });
+  if (!ok) return;
   try {
     const r = await API.reviseDokumen(id);
     showToast(`Draft revisi ${r.data?.revisi || ''} dibuat ✓`, 'success');
@@ -484,7 +496,14 @@ async function reviseIK(id) {
 }
 
 async function withdrawIK(id) {
-  const reason = prompt('Tarik dokumen (jadikan DITARIK / obsolete). Alasan (opsional):', '');
+  const reason = await confirmDialog({
+    title: 'Tarik Dokumen',
+    icon: 'archive-x',
+    danger: true,
+    message: 'Dokumen akan ditandai <b>DITARIK</b> (obsolete) dan tidak lagi berlaku. Tindakan ini sebaiknya hanya untuk dokumen yang sudah tidak dipakai.',
+    input: { label: 'Alasan penarikan (opsional)', placeholder: 'mis. Digantikan kebijakan baru…' },
+    confirmText: 'Tarik Dokumen',
+  });
   if (reason === null) return;
   try {
     await API.withdrawDoc(id, reason);

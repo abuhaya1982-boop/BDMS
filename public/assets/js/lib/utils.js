@@ -118,6 +118,51 @@ function openGenericModal(title, bodyHtml, footerHtml = '') {
   renderIcons();
 }
 
+// Confirm dialog (pengganti window.confirm / window.prompt yang nyaman & sesuai tema).
+// opts: { title, message(html), confirmText, cancelText, danger, icon, input }
+//   - Tanpa `input`  → resolve(true/false)
+//   - Dengan `input` → resolve(string trimmed) bila konfirmasi, atau null bila batal.
+//     input: { label, placeholder, value, required }
+function confirmDialog(opts = {}) {
+  return new Promise((resolve) => {
+    const {
+      title = 'Konfirmasi', message = '', confirmText = 'Lanjutkan',
+      cancelText = 'Batal', danger = false, icon: ic = 'help-circle', input = null,
+    } = opts;
+
+    const inputHtml = input ? `
+      <div style="margin-top:14px">
+        ${input.label ? `<label style="display:block;font-size:11.5px;font-weight:600;color:var(--text-secondary);margin-bottom:5px">${esc(input.label)}</label>` : ''}
+        <textarea id="__confirmDlgInput" rows="3" placeholder="${esc(input.placeholder || '')}"
+          style="width:100%;font-size:13px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;resize:vertical;font-family:inherit;box-sizing:border-box">${esc(input.value || '')}</textarea>
+      </div>` : '';
+
+    const body = `
+      <div style="display:flex;gap:14px;align-items:flex-start">
+        <div style="flex-shrink:0;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:${danger ? 'var(--danger-bg)' : 'var(--primary-light)'};color:${danger ? 'var(--danger)' : 'var(--primary)'}">${icon(ic, 22)}</div>
+        <div style="flex:1;font-size:13px;line-height:1.55;color:var(--text-secondary);padding-top:2px">${message}</div>
+      </div>${inputHtml}`;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="__confirmDlgDone(false)">${esc(cancelText)}</button>
+      <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" onclick="__confirmDlgDone(true)">${esc(confirmText)}</button>`;
+
+    window.__confirmDlgDone = (ok) => {
+      let val = null;
+      if (ok && input) {
+        val = (document.getElementById('__confirmDlgInput')?.value || '').trim();
+        if (input.required && !val) { showToast('Mohon isi terlebih dahulu', 'warning'); return; }
+      }
+      closeModal('modalGeneric');
+      window.__confirmDlgDone = null;
+      resolve(input ? (ok ? val : null) : ok);
+    };
+
+    openGenericModal(title, body, footer);
+    if (input) setTimeout(() => document.getElementById('__confirmDlgInput')?.focus(), 60);
+  });
+}
+
 // Format date
 function formatDate(dateStr) {
   if (!dateStr) return '-';
