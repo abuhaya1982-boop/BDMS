@@ -114,16 +114,6 @@ async function renderPengaturan(container) {
               <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Setiap IK wajib direview setelah periode ini. Standar: 12 bulan.</div>
             </div>
             <div class="form-group">
-              <label class="form-label">Default Tingkat Risiko</label>
-              <select class="form-control" id="set-default-risiko" style="width:180px">
-                <option value="Rendah" ${s.default_risiko === 'Rendah' ? 'selected' : ''}>Rendah</option>
-                <option value="Sedang" ${(s.default_risiko || 'Sedang') === 'Sedang' ? 'selected' : ''}>Sedang</option>
-                <option value="Tinggi" ${s.default_risiko === 'Tinggi' ? 'selected' : ''}>Tinggi</option>
-                <option value="Ekstrem" ${s.default_risiko === 'Ekstrem' ? 'selected' : ''}>Ekstrem</option>
-              </select>
-              <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Tingkat risiko default saat membuat dokumen IK baru.</div>
-            </div>
-            <div class="form-group">
               <label class="form-label">Auto-Arsip Setelah (bulan)</label>
               <input type="number" class="form-control" id="set-auto-archive" value="${s.auto_archive_months || '0'}" min="0" max="120" style="width:120px">
               <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Dokumen Published otomatis diarsipkan setelah N bulan. 0 = nonaktif.</div>
@@ -459,7 +449,6 @@ async function saveSettingsDokumen() {
   try {
     await API.saveSettings({
       review_period: document.getElementById('set-review-period')?.value || '12',
-      default_risiko: document.getElementById('set-default-risiko')?.value || 'Sedang',
       auto_archive_months: document.getElementById('set-auto-archive')?.value || '0',
       max_file_size_mb: document.getElementById('set-max-file')?.value || '10',
       watermark_draft: document.getElementById('set-watermark')?.checked !== false,
