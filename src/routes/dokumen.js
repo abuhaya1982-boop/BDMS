@@ -366,8 +366,8 @@ router.put('/:id', h.requireAuth, (req, res) => {
     if (b.risiko !== undefined) {
       db.prepare('DELETE FROM ik_risiko WHERE dokumen_id=?').run(id);
       if (b.risiko?.length) {
-        const stmt = db.prepare('INSERT INTO ik_risiko (dokumen_id, risiko, penyebab, dampak, kemungkinan, dampak_level, level_inheren, kontrol_existing, level_residual, mitigasi) VALUES (?,?,?,?,?,?,?,?,?,?)');
-        for (const r of b.risiko) stmt.run(id, r.risiko, r.penyebab || null, r.dampak || null, r.kemungkinan || null, r.dampak_level || null, r.skor_inheren || r.level_inheren || null, r.kontrol_existing || null, r.skor_residual || r.level_residual || null, r.mitigasi || null);
+        const stmt = db.prepare('INSERT INTO ik_risiko (dokumen_id, risiko, penyebab, dampak, kemungkinan, dampak_level, level_inheren, kontrol_existing, level_residual, mitigasi, residual_kemungkinan, residual_dampak) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)');
+        for (const r of b.risiko) stmt.run(id, r.risiko, r.penyebab || null, r.dampak || null, r.kemungkinan || null, r.dampak_level || null, r.skor_inheren || r.level_inheren || null, r.kontrol_existing || null, r.skor_residual || r.level_residual || null, r.mitigasi || null, r.residual_kemungkinan || null, r.residual_dampak || null);
       }
     }
 
@@ -563,7 +563,8 @@ function detectChangedSections(old, b, doc) {
   if (b.risiko !== undefined) {
     const pick = r => [r.risiko, r.penyebab, r.dampak, r.kemungkinan, r.dampak_level,
       r.level_inheren != null ? r.level_inheren : r.skor_inheren, r.kontrol_existing,
-      r.level_residual != null ? r.level_residual : r.skor_residual, r.mitigasi];
+      r.level_residual != null ? r.level_residual : r.skor_residual, r.mitigasi,
+      r.residual_kemungkinan, r.residual_dampak];
     if (_normArr(b.risiko, pick) !== _normArr(old.risiko, pick)) changed.push('Identifikasi Risiko');
   }
   if (b.dokumen_pendukung !== undefined || b.dokumen_referensi !== undefined || b.dokumen_perizinan !== undefined) {
