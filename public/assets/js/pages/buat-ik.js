@@ -714,7 +714,7 @@ function renderChangeHistory(section) {
   <div class="doc-section-title" style="margin-top:0">${esc(label)}</div>
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
     <div style="font-size:10px;color:#9E9A93;font-family:'Inter',sans-serif;display:flex;align-items:center;gap:4px">
-      ${icon('info', 12)} Riwayat dicatat otomatis oleh sistem saat dokumen diperbarui
+      ${icon('info', 12)} Bagian yang berubah dicatat otomatis. Anda boleh menambah keterangan detail (opsional) pada kolom Uraian.
     </div>
   </div>
   <div class="doc-table-wrap"><table>
@@ -729,12 +729,19 @@ function renderChangeHistory(section) {
   </table></div>`;
 }
 function renderChangeHistoryRow(idx, item) {
+  const auto = (Array.isArray(item.sections) && item.sections.length)
+    ? 'Perubahan pada ' + item.sections.join('; ')
+    : (item.uraian || '');
+  const note = item.catatan || '';
   return `<tr>
     <td style="text-align:center;font-size:11px;color:#4B463E">${idx}</td>
     <td style="font-size:11px;font-family:'Courier Prime','JetBrains Mono',monospace;color:#4B463E">${esc(item.halaman || '-')}</td>
-    <td style="font-size:11px;font-family:'Courier Prime','JetBrains Mono',monospace;color:#1a1a1a">${esc(item.uraian || '-')}</td>
+    <td style="font-size:11px;font-family:'Courier Prime','JetBrains Mono',monospace;color:#1a1a1a">
+      <div style="margin-bottom:3px">${esc(auto || '-')}</div>
+      <input class="ch-note" data-rev="${esc(item.revisi || '')}" value="${esc(note)}" placeholder="+ keterangan detail (opsional)" style="width:100%;font-size:10.5px;padding:3px 6px;border:1px solid #E0DDD5;border-radius:4px;font-family:'Inter',sans-serif;box-sizing:border-box">
+    </td>
     <td style="font-size:11px;font-family:'Courier Prime','JetBrains Mono',monospace;text-align:center;color:#4B463E">${esc(item.revisi || '00')}</td>
-    <td style="font-size:11px;font-family:'Courier Prime','JetBrains Mono',monospace;color:#4B463E">${item.tanggal ? formatDate(item.tanggal) : '-'}</td>
+    <td style="font-size:11px;font-family:'Courier Prime','JetBrains Mono',monospace;color:#4B463E">${esc(item.tanggal || '-')}</td>
   </tr>`;
 }
 function renumTable(sel) {
@@ -1505,9 +1512,21 @@ function collectDocData() {
     sdm: sdmSection ? collectDynTable('tbody-sdm', sdmSection.columns || ['Kompetensi', 'Jumlah', 'Keterangan']) : [],
     tools: toolsSection ? collectDynTable('tbody-tools', toolsSection.columns || ['Nama', 'Jumlah', 'Keterangan']) : [],
     material: materialSection ? collectDynTable('tbody-material', materialSection.columns || ['Nama', 'Jumlah', 'Keterangan']) : [],
-    // change_history is auto-managed server-side — not collected from UI
+    // Bagian yang berubah dideteksi otomatis server-side; di sini hanya kirim
+    // catatan manual (opsional) per revisi yang diisi penyusun di kolom Uraian.
+    change_history_notes: collectChangeHistoryNotes(),
     custom_sections: Object.keys(customSections).length > 0 ? customSections : undefined,
   };
+}
+
+// Map { "<revisi>": "<catatan manual>" } dari input opsional di Daftar Perubahan.
+function collectChangeHistoryNotes() {
+  const notes = {};
+  document.querySelectorAll('#changeHistoryBody .ch-note').forEach(inp => {
+    const rev = inp.dataset.rev || '';
+    if (rev) notes[rev] = inp.value || '';
+  });
+  return notes;
 }
 
 // ════════════════════════════════════════════

@@ -372,31 +372,43 @@ router.put('/:id', h.requireAuth, (req, res) => {
     }
 
     // Auto-catat Daftar Perubahan — SATU baris per revisi (akumulasi bagian yang
-    // berubah). Hanya saat revisi >= 01 (rev 00 = penerbitan awal, belum ada riwayat).
+    // berubah), plus catatan manual opsional dari penyusun. Hanya saat revisi >= 01.
     const curRev = (b.revisi !== undefined ? b.revisi : doc.revisi) || '00';
     let change_history = _parseHistory(_firstStep(db, id)?.change_history);
-    if (parseInt(curRev, 10) >= 1) {
-      const changed = detectChangedSections(_oldSnap, b, doc);
-      if (changed.length) {
-        const today = _todayStr(db);
-        let row = change_history.find(r => String(r.revisi) === String(curRev));
-        // Kumpulan bagian yang sudah tercatat untuk revisi ini (akumulasi antar simpan).
-        const set = new Set(
-          row && Array.isArray(row.sections) ? row.sections
-            : (row && row.halaman ? String(row.halaman).split(';').map(s => s.trim()).filter(Boolean) : [])
-        );
-        let added = false;
-        for (const label of changed) { if (!set.has(label)) { set.add(label); added = true; } }
-        if (added) {
-          const sections = Array.from(set);
-          const halaman = sections.length === 1 ? sections[0] : 'Beberapa bagian';
-          const uraian = 'Perubahan pada ' + sections.join('; ');
-          if (row) { row.halaman = halaman; row.uraian = uraian; row.sections = sections; row.tanggal = today; }
-          else { change_history.push({ halaman, uraian, revisi: curRev, tanggal: today, sections }); }
-          setChangeHistory(db, id, change_history);
+    const _autoText = (secs) => (secs && secs.length) ? ('Perubahan pada ' + secs.join('; ')) : '';
+    const _composeUraian = (secs, note) => [_autoText(secs), note].filter(Boolean).join(' — ');
+
+    // 1) Gabungkan catatan manual (opsional) — TIDAK menimpa deteksi otomatis.
+    const notes = (b.change_history_notes && typeof b.change_history_notes === 'object') ? b.change_history_notes : null;
+    if (notes) {
+      for (const r of change_history) {
+        const key = String(r.revisi);
+        if (Object.prototype.hasOwnProperty.call(notes, key)) {
+          r.catatan = String(notes[key] || '');
+          r.uraian = _composeUraian(Array.isArray(r.sections) ? r.sections : [], r.catatan);
         }
       }
     }
+
+    // 2) Deteksi bagian yang berubah untuk revisi aktif.
+    if (parseInt(curRev, 10) >= 1) {
+      const changed = detectChangedSections(_oldSnap, b, doc);
+      let row = change_history.find(r => String(r.revisi) === String(curRev));
+      const set = new Set(row && Array.isArray(row.sections) ? row.sections : []);
+      for (const label of changed) set.add(label);
+      const curNote = notes && Object.prototype.hasOwnProperty.call(notes, String(curRev))
+        ? String(notes[String(curRev)] || '')
+        : (row && row.catatan ? row.catatan : '');
+      if (set.size || curNote) {
+        const sections = Array.from(set);
+        const halaman = sections.length === 0 ? '—' : (sections.length === 1 ? sections[0] : 'Beberapa bagian');
+        const uraian = _composeUraian(sections, curNote);
+        if (row) { row.halaman = halaman; row.uraian = uraian; row.sections = sections; row.catatan = curNote; if (changed.length) row.tanggal = _todayStr(db); }
+        else { change_history.push({ halaman, uraian, revisi: curRev, tanggal: _todayStr(db), sections, catatan: curNote }); }
+      }
+    }
+
+    if (change_history.length) setChangeHistory(db, id, change_history);
 
     h.logAudit(req, 'UPDATE_DOCUMENT', `Dokumen ${doc.nomor_dokumen} diperbarui`, 'dokumen');
     h.success(res, { change_history }, 'Dokumen berhasil diperbarui');
