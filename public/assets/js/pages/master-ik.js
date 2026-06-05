@@ -114,6 +114,7 @@ async function renderMasterIK(container, docs) {
       <span id="ikBulkCount" style="font-size:12px;font-weight:600">0 dipilih</span>
       <button class="btn btn-sm" style="background:#fff;color:var(--primary,#1E3A5F)" onclick="bulkDownloadDocx()">${icon('download', 14)} Download ZIP</button>
       <button class="btn btn-sm" style="background:#fff;color:var(--primary,#1E3A5F)" onclick="bulkUploadDrive()">${icon('cloud-upload', 14)} Upload ke Drive</button>
+      ${['Admin', 'Super Admin'].includes(APP.user?.role) ? `<button class="btn btn-sm" style="background:var(--danger,#C0392B);color:#fff" onclick="deleteSelectedIK()">${icon('trash-2', 14)} Hapus Terpilih</button>` : ''}
       <button class="btn btn-sm" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.5)" onclick="clearIKSelection()">${icon('x', 14)} Batal</button>
     </div>
 
@@ -233,6 +234,34 @@ function updateIKBulkBar() {
     sa.checked = checkedCount === all.length;
     sa.indeterminate = checkedCount > 0 && checkedCount < all.length;
   }
+}
+
+async function deleteSelectedIK() {
+  const ids = [..._ikSelected];
+  if (!ids.length) return;
+  const docs = APP.cache.allIK || [];
+  const preview = ids.slice(0, 8).map(id => {
+    const d = docs.find(x => x.id === id) || {};
+    return `• ${esc(d.nomor_dokumen || ('ID ' + id))} — ${esc((d.judul || '').slice(0, 40))}`;
+  }).join('<br>');
+  const ok = await confirmDialog({
+    title: 'Hapus Dokumen Terpilih',
+    icon: 'trash-2',
+    danger: true,
+    message: `Akan menghapus <b>${ids.length} dokumen</b> beserta seluruh isinya (langkah, risiko, arsip versi, dll) secara <b>permanen</b>. Tindakan ini tidak bisa dibatalkan.<br><br>${preview}${ids.length > 8 ? `<br>… dan ${ids.length - 8} lainnya` : ''}`,
+    input: { label: `Ketik HAPUS untuk konfirmasi`, placeholder: 'HAPUS', type: 'text', required: true },
+    confirmText: `Hapus ${ids.length} Dokumen`,
+  });
+  if (ok === null) return;
+  if (String(ok).trim().toUpperCase() !== 'HAPUS') { showToast('Konfirmasi tidak cocok — pembatalan', 'warning'); return; }
+  let done = 0, fail = 0;
+  for (const id of ids) {
+    try { await API.deleteDokumen(id); done++; } catch (e) { fail++; }
+  }
+  clearIKSelection();
+  APP.cache.masterIK = null;
+  await renderMasterIK(document.getElementById('appContent'));
+  showToast(`Terhapus ${done} dokumen${fail ? `, ${fail} gagal` : ''} ✓`, fail ? 'warning' : 'success');
 }
 
 async function bulkDownloadDocx() {
