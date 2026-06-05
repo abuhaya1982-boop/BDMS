@@ -126,26 +126,35 @@ router.post('/approve-t2', h.requireAuth, (req, res) => {
     if (!doc) return h.notFound(res);
     if (doc.status !== 'Approved-T2') return h.error(res, 'Dokumen harus berstatus Approved-T2');
 
-    db.prepare("UPDATE ik_documents SET status='Published', tanggal_terbit=datetime('now','localtime'), review_due=date('now','localtime','+2 years'), updated_at=datetime('now','localtime') WHERE id=?").run(dokumen_id);
-    addApproval(db, dokumen_id, userId, 'Approve-SM', catatan);
+    // Publish + supersede dijalankan atomik: bila pengarsipan versi lama gagal,
+    // penerbitan ikut dibatalkan (tidak ada dua dokumen Published bernomor sama).
+    let supersededFrom = null;
+    const publishTx = db.transaction(() => {
+      db.prepare("UPDATE ik_documents SET status='Published', tanggal_terbit=datetime('now','localtime'), review_due=date('now','localtime','+2 years'), updated_at=datetime('now','localtime') WHERE id=?").run(dokumen_id);
+      addApproval(db, dokumen_id, userId, 'Approve-SM', catatan);
 
-    // Bila ini draft revisi: ambil alih nomor kanonik & arsipkan versi lama (superseded).
-    if (doc.revisi_dari) {
-      const parent = db.prepare('SELECT * FROM ik_documents WHERE id=?').get(doc.revisi_dari);
-      if (parent && parent.status === 'Published') {
-        const canonical = parent.nomor_dokumen;
-        let archivedNomor = `${canonical} -R${parent.revisi}`;
-        let attempt = 0;
-        while (db.prepare('SELECT 1 FROM ik_documents WHERE nomor_dokumen=? AND id!=?').get(archivedNomor, parent.id)) {
-          attempt++; archivedNomor = `${canonical} -R${parent.revisi}.${attempt}`;
+      // Bila ini draft revisi: ambil alih nomor kanonik & arsipkan versi lama (superseded).
+      if (doc.revisi_dari) {
+        const parent = db.prepare('SELECT * FROM ik_documents WHERE id=?').get(doc.revisi_dari);
+        if (parent && parent.status === 'Published') {
+          const canonical = parent.nomor_dokumen;
+          let archivedNomor = `${canonical} -R${parent.revisi}`;
+          let attempt = 0;
+          while (db.prepare('SELECT 1 FROM ik_documents WHERE nomor_dokumen=? AND id!=?').get(archivedNomor, parent.id)) {
+            attempt++; archivedNomor = `${canonical} -R${parent.revisi}.${attempt}`;
+          }
+          // Arsipkan parent (membebaskan nomor kanonik) lalu pindahkan ke draft revisi.
+          db.prepare("UPDATE ik_documents SET nomor_dokumen=?, status='Archived', superseded_by=?, archived_reason='Direvisi', archived_at=datetime('now','localtime'), updated_at=datetime('now','localtime') WHERE id=?")
+            .run(archivedNomor, dokumen_id, parent.id);
+          db.prepare("UPDATE ik_documents SET nomor_dokumen=? WHERE id=?").run(canonical, dokumen_id);
+          doc.nomor_dokumen = canonical;
+          supersededFrom = archivedNomor;
         }
-        // Arsipkan parent (membebaskan nomor kanonik) lalu pindahkan ke draft revisi.
-        db.prepare("UPDATE ik_documents SET nomor_dokumen=?, status='Archived', superseded_by=?, archived_reason='Direvisi', archived_at=datetime('now','localtime'), updated_at=datetime('now','localtime') WHERE id=?")
-          .run(archivedNomor, dokumen_id, parent.id);
-        db.prepare("UPDATE ik_documents SET nomor_dokumen=? WHERE id=?").run(canonical, dokumen_id);
-        doc.nomor_dokumen = canonical;
-        h.logAudit(req, 'SUPERSEDE_DOCUMENT', `Versi lama ${archivedNomor} digantikan revisi ${doc.revisi} (${canonical})`, 'workflow');
       }
+    });
+    publishTx();
+    if (supersededFrom) {
+      h.logAudit(req, 'SUPERSEDE_DOCUMENT', `Versi lama ${supersededFrom} digantikan revisi ${doc.revisi} (${doc.nomor_dokumen})`, 'workflow');
     }
 
     h.logAudit(req, 'APPROVE_T2', `Dokumen ${doc.nomor_dokumen} diapprove SM & diterbitkan`, 'workflow');

@@ -450,6 +450,35 @@ function bumpRevisi(rev) {
   return String(n + 1).padStart(2, '0');
 }
 
+// ── Helpers: Daftar Perubahan Dokumen (change_history disimpan di ik_steps) ──
+function _firstStep(db, docId) {
+  return db.prepare('SELECT * FROM ik_steps WHERE dokumen_id=? ORDER BY step LIMIT 1').get(docId);
+}
+function _parseHistory(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  try { const a = JSON.parse(raw); return Array.isArray(a) ? a : []; } catch { return []; }
+}
+// Tambah satu baris ke Daftar Perubahan Dokumen. Membuat ik_steps bila belum ada.
+function appendChangeHistory(db, docId, entry) {
+  const row = _firstStep(db, docId);
+  if (row) {
+    const hist = _parseHistory(row.change_history);
+    hist.push(entry);
+    db.prepare('UPDATE ik_steps SET change_history=? WHERE id=?').run(JSON.stringify(hist), row.id);
+  } else {
+    db.prepare('INSERT INTO ik_steps (dokumen_id, step, change_history) VALUES (?,1,?)')
+      .run(docId, JSON.stringify([entry]));
+  }
+}
+function setChangeHistory(db, docId, arr) {
+  const row = _firstStep(db, docId);
+  if (row) db.prepare('UPDATE ik_steps SET change_history=? WHERE id=?').run(JSON.stringify(arr || []), row.id);
+}
+function _todayStr(db) {
+  return db.prepare("SELECT strftime('%d-%m-%Y','now','localtime') AS t").get().t;
+}
+
 // POST /:id/duplicate — Salin dokumen sebagai IK baru (nomor baru, revisi 00, Draft)
 router.post('/:id/duplicate', h.requireAuth, (req, res) => {
   try {
@@ -461,6 +490,8 @@ router.post('/:id/duplicate', h.requireAuth, (req, res) => {
       judul: (src.judul || 'Tanpa Judul') + ' (Salinan)',
       revisi: '00', status: 'Draft',
     });
+    // Salinan adalah IK baru (Rev 00) — mulai dengan Daftar Perubahan kosong.
+    setChangeHistory(db, out.id, []);
     h.logAudit(req, 'DUPLICATE_DOCUMENT', `Dokumen ${src.nomor_dokumen} disalin menjadi ${out.nomor_dokumen}`, 'dokumen');
     h.created(res, out);
   } catch (err) { h.error(res, err.message); }
@@ -487,6 +518,13 @@ router.post('/:id/revisi', h.requireAuth, (req, res) => {
       judul: src.judul,
       revisi: newRev, status: 'Draft',
       nomor: tempNomor, revisi_dari: src.id,
+    });
+    // Catat otomatis ke Daftar Perubahan Dokumen (mewarisi riwayat lama + baris baru).
+    appendChangeHistory(db, out.id, {
+      halaman: 'Seluruh dokumen',
+      uraian: `Revisi berkala (Rev ${src.revisi} → Rev ${newRev})`,
+      revisi: newRev,
+      tanggal: _todayStr(db),
     });
     h.logAudit(req, 'REVISE_DOCUMENT', `Draft revisi ${newRev} dibuat dari ${src.nomor_dokumen}`, 'dokumen');
     h.created(res, { ...out, revisi: newRev, parent_nomor: src.nomor_dokumen });
