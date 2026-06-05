@@ -335,6 +335,13 @@ function buildPrintableDoc(d, ctx) {
   const penyusunNama = escH(d.penyusun_nama || owner || '-');
   const penyusunJab = escH(d.penyusun_jabatan || '');
 
+  // ── Watermark berdasarkan status dokumen ──
+  // Draft (belum disahkan) = abu-abu; Terkendali (Published) = merah. Diagonal kanan.
+  let wmText = 'DRAFT', wmColor = '#8A8F98', wmOpacity = 0.16;
+  if (d.status === 'Published') { wmText = 'TERKENDALI'; wmColor = '#C0392B'; wmOpacity = 0.12; }
+  else if (d.status === 'Archived') { wmText = 'TIDAK BERLAKU'; wmColor = '#8A8F98'; wmOpacity = 0.16; }
+  else if (d.status === 'Rejected') { wmText = 'DITOLAK'; wmColor = '#8A8F98'; wmOpacity = 0.16; }
+
   // ── CSS ──
   const css = `
 @page{size:A4;margin:15mm 10mm 15mm 20mm}
@@ -410,11 +417,17 @@ table.step-tbl td{white-space:pre-wrap;word-wrap:break-word}
 table.step-tbl ul,table.step-tbl ol{margin:2px 0 2px 16px;padding:0}
 table.step-tbl li{margin-bottom:1px}
 .step-meta{color:#555;font-size:8.5pt}
-.sec-content{margin:4px 0 12px;font-size:10pt;overflow-wrap:break-word;word-wrap:break-word;word-break:break-word;max-width:100%;overflow:hidden;text-align:justify}
+.sec-content{margin:4px 0 12px;font-size:10pt;overflow-wrap:break-word;word-wrap:break-word;word-break:break-word;max-width:100%;overflow:visible;text-align:justify}
+/* Seragamkan SEMUA font isi (termasuk hasil copy-paste) ke satu jenis */
+.sec-content,.sec-content *{font-family:'Courier Prime','Courier New',Courier,monospace!important}
 .sec-content p,.sec-content div,.sec-content span,.sec-content li{max-width:100%!important;margin-left:0!important;margin-right:0!important;text-indent:0!important}
 .sec-content ul,.sec-content ol{max-width:100%!important;margin-left:20px!important;margin-right:0!important;padding-left:0!important}
 .sec-content table{max-width:100%!important;width:100%!important;table-layout:fixed}
-.sec-content img{max-width:100%!important;height:auto!important}
+/* Gambar tidak terpotong: muat dalam 1 halaman (lebar & tinggi dibatasi) */
+.sec-content img{max-width:100%!important;max-height:200mm!important;height:auto!important;display:block;margin:6px auto;page-break-inside:avoid;break-inside:avoid}
+/* Watermark status — diagonal kanan, transparan */
+.watermark{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:flex-end;padding-right:7%;pointer-events:none;z-index:50;overflow:hidden}
+.watermark span{transform:rotate(-50deg);font-family:'Courier Prime','Courier New',Courier,monospace;font-weight:700;font-size:50pt;letter-spacing:6px;white-space:nowrap;border:5px solid currentColor;border-radius:10px;padding:10px 32px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .sec-content p.content{margin:4px 0}
 .sec-content ul.content-list{margin:4px 0 8px 20px}
 
@@ -574,6 +587,7 @@ table.step-tbl li{margin-bottom:1px}
         .replace(/tab-stops\s*:\s*[^;"']+;?/gi, '')         // Remove tab-stops
         .replace(/line-height\s*:\s*[^;"']+;?/gi, '')       // Remove line-height overrides
         .replace(/font-family\s*:\s*[^;"']+;?/gi, '')       // Remove custom font-family
+        .replace(/<\/?font[^>]*>/gi, '')                     // Remove <font face=...> tags (seragamkan font)
         .replace(/class="Mso[^"]*"/gi, '')                   // Remove MsoNormal etc classes
         .replace(/<o:p><\/o:p>/gi, '')                       // Remove Office XML tags
         .replace(/style="\s*"/g, '')                         // Remove empty style attrs
@@ -971,6 +985,7 @@ table.step-tbl li{margin-bottom:1px}
   <button class="btn-green" onclick="downloadDocxNative(this)">&#128196; Download Word (.docx)</button>
   <button class="btn-lite" onclick="downloadAsDoc()" title="Versi ringan (.doc) bila server tidak tersedia">.doc (cadangan)</button>
 </div>
+<div class="watermark" aria-hidden="true"><span style="color:${wmColor};opacity:${wmOpacity}">${wmText}</span></div>
 <div class="page-container">
   ${coverHtml}
   ${page2}
