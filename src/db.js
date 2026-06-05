@@ -24,7 +24,13 @@ function getDB() {
   _db.pragma('foreign_keys = ON');
 
   if (needsInit) autoInit(_db);
-  else migrateDB(_db);
+  // Always run migrateDB — it is idempotent (ALTERs wrapped in try/catch,
+  // CREATE IF NOT EXISTS, seed-if-empty). This guarantees a freshly auto-init'd
+  // DB also gets the additive columns (revisi_dari, superseded_by, archived_*,
+  // gdrive_*) and risk_matrix that live only in migrateDB, not in autoInit's
+  // CREATE TABLE. Without this, Duplikat/Revisi IK fail on fresh databases
+  // with "table ik_documents has no column named revisi_dari".
+  migrateDB(_db);
   return _db;
 }
 
