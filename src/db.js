@@ -56,6 +56,23 @@ function migrateDB(db) {
     try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`); } catch(e) { /* already exists */ }
   }
 
+  // ── Arsip Riwayat Versi dokumen (added v3.2) ──
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS ik_document_versions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        dokumen_id INTEGER NOT NULL,
+        revisi TEXT,
+        nomor_dokumen TEXT,
+        judul TEXT,
+        snapshot TEXT,
+        archived_by INTEGER,
+        archived_at TEXT DEFAULT (datetime('now','localtime')),
+        FOREIGN KEY (dokumen_id) REFERENCES ik_documents(id) ON DELETE CASCADE
+      );
+    `);
+  } catch(e) { /* already exists */ }
+
   // ── Risk Matrix table (added v3.1) ──
   try {
     db.exec(`

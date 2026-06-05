@@ -189,6 +189,7 @@ function renderIKRows(docs, cols) {
           ${d.status === 'Published' && _canDrive ? `<button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" onclick="uploadIKToDrive(${d.id})" title="${d.gdrive_url ? 'Unggah ulang ke Google Drive' : 'Unggah ke Google Drive'}">${icon('cloud-upload', 14)}</button>` : ''}
           <button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" onclick="duplicateIK(${d.id})" title="Salin sebagai IK baru">${icon('copy', 14)}</button>
           ${d.status === 'Published' ? `<button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" onclick="reviseIK(${d.id})" title="Buat revisi">${icon('git-compare', 14)}</button>` : ''}
+          <button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px" onclick="openVersionHistory(${d.id}, '${esc((d.nomor_dokumen || '').replace(/'/g, ''))}')" title="Riwayat Versi">${icon('history', 14)}</button>
           ${(d.status === 'Published' || d.status === 'Archived') && _canDrive && !(d.archived_reason || '').toLowerCase().includes('tarik') ? `<button class="btn btn-secondary btn-xs" style="padding:2px 6px;font-size:11px;color:var(--danger)" onclick="withdrawIK(${d.id})" title="Tarik dokumen (DITARIK)">${icon('archive-x', 14)}</button>` : ''}
         </div>
       </td>
@@ -512,6 +513,65 @@ async function withdrawIK(id) {
     await renderMasterIK(document.getElementById('appContent'));
   } catch (e) {
     showToast('Gagal menarik dokumen: ' + e.message, 'error');
+  }
+}
+
+// ─── RIWAYAT VERSI (arsip snapshot) ───
+async function openVersionHistory(id, nomor) {
+  openGenericModal(`Riwayat Versi — ${esc(nomor || '')}`,
+    `<div id="versionListBody" style="font-size:13px;color:var(--text-secondary);padding:8px 0">Memuat…</div>`,
+    `<button class="btn btn-secondary" onclick="closeModal('modalGeneric')">Tutup</button>`);
+  openModal('modalGeneric');
+  try {
+    const res = await API.getDocVersions(id);
+    const rows = res.data || [];
+    const body = document.getElementById('versionListBody');
+    if (!body) return;
+    if (!rows.length) {
+      body.innerHTML = `<div style="text-align:center;padding:18px;color:var(--text-tertiary)">${icon('inbox', 18)}<div style="margin-top:6px">Belum ada arsip versi.<br>Versi lama tersimpan otomatis saat dokumen mulai direvisi.</div></div>`;
+      renderIcons();
+      return;
+    }
+    body.innerHTML = `
+      <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+        <thead><tr style="background:var(--surface-3,#F4F7FB);text-align:left">
+          <th style="padding:6px 8px">Revisi</th>
+          <th style="padding:6px 8px">Nomor</th>
+          <th style="padding:6px 8px">Diarsipkan</th>
+          <th style="padding:6px 8px">Oleh</th>
+          <th style="padding:6px 8px;text-align:right">Aksi</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(v => `
+            <tr style="border-bottom:1px solid var(--border,#E5E7EB)">
+              <td style="padding:6px 8px"><span class="badge badge-gray">Rev ${esc(v.revisi || '00')}</span></td>
+              <td style="padding:6px 8px;font-family:monospace">${esc(v.nomor_dokumen || '-')}</td>
+              <td style="padding:6px 8px">${esc((v.archived_at || '').slice(0, 16).replace('T', ' '))}</td>
+              <td style="padding:6px 8px">${esc(v.archived_by_nama || '-')}</td>
+              <td style="padding:6px 8px;text-align:right;white-space:nowrap">
+                <button class="btn btn-secondary btn-xs" style="padding:2px 6px" onclick="previewVersion(${id}, ${v.id})" title="Lihat">${icon('eye', 13)}</button>
+                <button class="btn btn-secondary btn-xs" style="padding:2px 6px" onclick="previewVersion(${id}, ${v.id}, 'pdf')" title="Cetak / Simpan PDF">${icon('printer', 13)}</button>
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+      <div style="font-size:11px;color:var(--text-tertiary);margin-top:8px">${icon('info', 12)} Versi lama bersifat read-only (arsip audit). Gunakan Cetak/PDF untuk mengunduh sebagai bukti perbandingan.</div>`;
+    renderIcons();
+  } catch (e) {
+    const body = document.getElementById('versionListBody');
+    if (body) body.innerHTML = `<div style="color:var(--danger)">Gagal memuat riwayat versi: ${esc(e.message)}</div>`;
+  }
+}
+
+async function previewVersion(id, vid, mode) {
+  try {
+    const res = await API.getDocVersion(id, vid);
+    const snap = res.data && res.data.snapshot;
+    if (!snap || !snap.nomor_dokumen) { showToast('Snapshot versi tidak tersedia', 'error'); return; }
+    if (typeof renderDocPreview === 'function') await renderDocPreview(snap, mode);
+    else showToast('Fungsi preview tidak tersedia', 'error');
+  } catch (e) {
+    showToast('Gagal membuka versi: ' + e.message, 'error');
   }
 }
 

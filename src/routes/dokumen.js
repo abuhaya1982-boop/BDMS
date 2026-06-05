@@ -60,10 +60,8 @@ router.get('/preview-number', h.requireAuth, (req, res) => {
   } catch (err) { h.error(res, err.message); }
 });
 
-// GET /:id — Full document with all sub-tables
-router.get('/:id', h.requireAuth, (req, res) => {
-  try {
-    const db = getDB();
+// ── Helper: assemble full document bundle (bentuk sama dgn yang dikembalikan GET /:id) ──
+function assembleDocument(db, id) {
     const doc = db.prepare(`
       SELECT d.*, u.nama as unit_nama, u.kode_dokumen, p.nama as probis_nama, p.nomor as probis_nomor,
         usr.nama as owner_nama,
@@ -73,10 +71,8 @@ router.get('/:id', h.requireAuth, (req, res) => {
       LEFT JOIN users appr ON appr.id=d.approver_id
       LEFT JOIN users peng ON peng.id=d.pengesahan_id
       WHERE d.id=?
-    `).get(req.params.id);
-    if (!doc) return h.notFound(res, 'Dokumen tidak ditemukan');
-
-    const id = req.params.id;
+    `).get(id);
+    if (!doc) return null;
 
     // Steps — stored as rows in ik_steps, merge into a flat object for frontend
     const stepRows = db.prepare('SELECT * FROM ik_steps WHERE dokumen_id=? ORDER BY step').all(id);
@@ -130,7 +126,7 @@ router.get('/:id', h.requireAuth, (req, res) => {
       }
     }
 
-    h.success(res, {
+    return {
       ...doc,
       ttd,
       custom_sections,
@@ -144,11 +140,42 @@ router.get('/:id', h.requireAuth, (req, res) => {
       attachments_formulir: Array.isArray(konten.attachments_formulir) ? konten.attachments_formulir : [],
       attachments_data_teknik: Array.isArray(konten.attachments_data_teknik) ? konten.attachments_data_teknik : [],
       sdm, tools, material, formulir, risiko, approvals
-    });
+    };
+}
+
+// GET /:id — Full document with all sub-tables
+router.get('/:id', h.requireAuth, (req, res) => {
+  try {
+    const bundle = assembleDocument(getDB(), req.params.id);
+    if (!bundle) return h.notFound(res, 'Dokumen tidak ditemukan');
+    h.success(res, bundle);
   } catch (err) {
     console.error('GET /dokumen/:id error:', err);
     h.error(res, err.message);
   }
+});
+
+// GET /:id/versions — daftar arsip versi (metadata saja, tanpa snapshot besar)
+router.get('/:id/versions', h.requireAuth, (req, res) => {
+  try {
+    const rows = getDB().prepare(`
+      SELECT v.id, v.revisi, v.nomor_dokumen, v.judul, v.archived_at, u.nama AS archived_by_nama
+      FROM ik_document_versions v LEFT JOIN users u ON u.id=v.archived_by
+      WHERE v.dokumen_id=? ORDER BY v.archived_at DESC, v.id DESC
+    `).all(req.params.id);
+    h.success(res, rows);
+  } catch (err) { h.error(res, err.message); }
+});
+
+// GET /:id/versions/:vid — snapshot lengkap satu versi (untuk preview/cetak)
+router.get('/:id/versions/:vid', h.requireAuth, (req, res) => {
+  try {
+    const row = getDB().prepare('SELECT * FROM ik_document_versions WHERE id=? AND dokumen_id=?').get(req.params.vid, req.params.id);
+    if (!row) return h.notFound(res, 'Versi tidak ditemukan');
+    let snapshot = {};
+    try { snapshot = JSON.parse(row.snapshot || '{}'); } catch {}
+    h.success(res, { ...row, snapshot });
+  } catch (err) { h.error(res, err.message); }
 });
 
 // ── Helper: save steps (object) into ik_steps table + konten JSON ──
@@ -611,6 +638,18 @@ router.post('/:id/revisi', h.requireAuth, (req, res) => {
     const src = db.prepare('SELECT * FROM ik_documents WHERE id=?').get(req.params.id);
     if (!src) return h.notFound(res, 'Dokumen tidak ditemukan');
     if (src.status !== 'Published') return h.error(res, 'Hanya dokumen berstatus Published yang bisa direvisi');
+
+    // Abadikan snapshot versi yang BERLAKU (sebelum diedit) ke arsip Riwayat Versi.
+    // Disimpan permanen di DB → bukti audit versi sebelumnya.
+    try {
+      const exists = db.prepare('SELECT 1 FROM ik_document_versions WHERE dokumen_id=? AND revisi=? AND nomor_dokumen=?')
+        .get(src.id, src.revisi, src.nomor_dokumen);
+      if (!exists) {
+        const bundle = assembleDocument(db, src.id);
+        db.prepare('INSERT INTO ik_document_versions (dokumen_id, revisi, nomor_dokumen, judul, snapshot, archived_by) VALUES (?,?,?,?,?,?)')
+          .run(src.id, src.revisi, src.nomor_dokumen, src.judul || null, JSON.stringify(bundle || {}), req.session.user_id);
+      }
+    } catch (e) { console.error('snapshot versi gagal:', e.message); /* jangan blok revisi */ }
 
     const newRev = bumpRevisi(src.revisi);
     db.prepare("UPDATE ik_documents SET revisi=?, status='Draft', tanggal_diperbarui=date('now','localtime'), updated_at=datetime('now','localtime') WHERE id=?")

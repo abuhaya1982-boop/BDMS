@@ -137,7 +137,16 @@ async function downloadDocx(id) {
 async function previewDokumenFull(id, mode) {
   try {
     const res = await API.getDokumenById(id);
-    const d = res.data;
+    await renderDocPreview(res.data, mode);
+  } catch (e) {
+    console.error('previewDokumenFull error:', e);
+    showToast('Gagal memuat dokumen: ' + (e.message || JSON.stringify(e)), 'error');
+  }
+}
+
+// Render preview/cetak dari sebuah bundle dokumen (dipakai juga untuk snapshot Riwayat Versi)
+async function renderDocPreview(d, mode) {
+  try {
     const unit = d.unit_nama || '';
     const probis = d.probis_nama || '';
     const owner = d.owner_nama || '';

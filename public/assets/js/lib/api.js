@@ -81,6 +81,8 @@ const API = {
   getRecentDokumen() { return this.get('dokumen/recent'); },
   duplicateDokumen(id) { return this.post('dokumen/' + id + '/duplicate'); },
   reviseDokumen(id) { return this.post('dokumen/' + id + '/revisi'); },
+  getDocVersions(id) { return this.get('dokumen/' + id + '/versions'); },
+  getDocVersion(id, vid) { return this.get('dokumen/' + id + '/versions/' + vid); },
 
   // Dashboard
   getDashboard() { return this.get('dashboard'); },
