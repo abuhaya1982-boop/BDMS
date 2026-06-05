@@ -371,19 +371,31 @@ router.put('/:id', h.requireAuth, (req, res) => {
       }
     }
 
-    // Auto-catat Daftar Perubahan untuk section yang berubah.
-    // Hanya saat revisi >= 01 (rev 00 = penerbitan awal, belum ada riwayat).
+    // Auto-catat Daftar Perubahan — SATU baris per revisi (akumulasi bagian yang
+    // berubah). Hanya saat revisi >= 01 (rev 00 = penerbitan awal, belum ada riwayat).
     const curRev = (b.revisi !== undefined ? b.revisi : doc.revisi) || '00';
     let change_history = _parseHistory(_firstStep(db, id)?.change_history);
     if (parseInt(curRev, 10) >= 1) {
       const changed = detectChangedSections(_oldSnap, b, doc);
-      const today = _todayStr(db);
-      let added = false;
-      for (const label of changed) {
-        const dup = change_history.some(r => _norm(r.halaman) === _norm(label) && String(r.revisi) === String(curRev));
-        if (!dup) { change_history.push({ halaman: label, uraian: 'Perubahan pada ' + label, revisi: curRev, tanggal: today }); added = true; }
+      if (changed.length) {
+        const today = _todayStr(db);
+        let row = change_history.find(r => String(r.revisi) === String(curRev));
+        // Kumpulan bagian yang sudah tercatat untuk revisi ini (akumulasi antar simpan).
+        const set = new Set(
+          row && Array.isArray(row.sections) ? row.sections
+            : (row && row.halaman ? String(row.halaman).split(';').map(s => s.trim()).filter(Boolean) : [])
+        );
+        let added = false;
+        for (const label of changed) { if (!set.has(label)) { set.add(label); added = true; } }
+        if (added) {
+          const sections = Array.from(set);
+          const halaman = sections.length === 1 ? sections[0] : 'Beberapa bagian';
+          const uraian = 'Perubahan pada ' + sections.join('; ');
+          if (row) { row.halaman = halaman; row.uraian = uraian; row.sections = sections; row.tanggal = today; }
+          else { change_history.push({ halaman, uraian, revisi: curRev, tanggal: today, sections }); }
+          setChangeHistory(db, id, change_history);
+        }
       }
-      if (added) setChangeHistory(db, id, change_history);
     }
 
     h.logAudit(req, 'UPDATE_DOCUMENT', `Dokumen ${doc.nomor_dokumen} diperbarui`, 'dokumen');
