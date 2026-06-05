@@ -108,8 +108,12 @@ function showToast(msg, type = 'info') {
 }
 
 // Modal
-function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id) { const el = document.getElementById(id); if (el) el.classList.add('open'); }
+function closeModal(id) { const el = document.getElementById(id); if (el) el.classList.remove('open'); }
+// Escape menutup modal generik (escape hatch bila overlay tersangkut)
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') { const m = document.getElementById('modalGeneric'); if (m && m.classList.contains('open')) closeModal('modalGeneric'); }
+});
 function openGenericModal(title, bodyHtml, footerHtml = '') {
   document.getElementById('modalGenericTitle').textContent = title;
   document.getElementById('modalGenericBody').innerHTML = bodyHtml;

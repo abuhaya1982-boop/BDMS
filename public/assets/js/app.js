@@ -1454,6 +1454,9 @@ async function showPage(id) {
   });
   document.getElementById('currentPageTitle').textContent = PAGE_TITLES[id] || id;
   closeNotif();
+  // Tutup modal yang mungkin masih terbuka agar overlay-nya tidak memblokir
+  // interaksi (mis. tidak bisa mengetik) di halaman tujuan.
+  closeModal('modalGeneric');
 
   // Render page
   const content = document.getElementById('appContent');
