@@ -1132,7 +1132,8 @@ async function loadDokumenForEdit(id) {
     const tglUpdate = document.getElementById('f-tgl-update');
     if (tglUpdate && d.tanggal_diperbarui) tglUpdate.value = d.tanggal_diperbarui;
     const revisi = document.getElementById('f-revisi');
-    if (revisi) revisi.value = d.revisi || 0;
+    // Opsi dropdown bernilai 0..5; revisi tersimpan "00".."05" → petakan via parseInt.
+    if (revisi) revisi.value = String(parseInt(d.revisi, 10) || 0);
     const prepared = document.getElementById('f-prepared');
     if (prepared) prepared.value = d.penyusun_nama || APP.user?.nama || '';
     const preparedJab = document.getElementById('f-prepared-jabatan');
@@ -1490,7 +1491,7 @@ function collectDocData() {
     tanggal_ditetapkan: g('f-tgl'),
     tanggal_diperbarui: g('f-tgl-update'),
     tingkat_risiko: 'Sedang',
-    revisi: parseInt(g('f-revisi')) || 0,
+    revisi: String(parseInt(g('f-revisi'), 10) || 0).padStart(2, '0'),
     penyusun_nama: g('f-prepared'),
     penyusun_jabatan: g('f-prepared-jabatan'),
     doc_owner_id: g('f-doc-owner') || null,
