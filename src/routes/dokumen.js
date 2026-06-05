@@ -155,6 +155,11 @@ router.get('/:id', h.requireAuth, (req, res) => {
 function saveSteps(db, docId, stepsObj) {
   if (!stepsObj || typeof stepsObj !== 'object') return;
 
+  // Pertahankan Daftar Perubahan (change_history) — jangan ikut terhapus saat
+  // baris ik_steps di-rebuild. (Dulu hilang tiap simpan → riwayat tak pernah ada.)
+  const prev = db.prepare('SELECT change_history FROM ik_steps WHERE dokumen_id=? ORDER BY step LIMIT 1').get(docId);
+  const prevHist = prev ? prev.change_history : null;
+
   db.prepare('DELETE FROM ik_steps WHERE dokumen_id=?').run(docId);
 
   // ik_steps columns
@@ -170,9 +175,9 @@ function saveSteps(db, docId, stepsObj) {
 
   db.prepare(`INSERT INTO ik_steps (dokumen_id, step, tujuan, ruang_lingkup,
     aktivitas_persiapan, aktivitas_pelaksanaan, aktivitas_monitoring, aktivitas_tindak_lanjut,
-    metode_pengukuran, data_teknik) VALUES (?,1,?,?,?,?,?,?,?,?)`)
+    metode_pengukuran, data_teknik, change_history) VALUES (?,1,?,?,?,?,?,?,?,?,?)`)
     .run(docId, tujuan, ruang_lingkup, aktivitas_persiapan, aktivitas_pelaksanaan,
-      aktivitas_monitoring, aktivitas_tindak_lanjut, metode_pengukuran, data_teknik);
+      aktivitas_monitoring, aktivitas_tindak_lanjut, metode_pengukuran, data_teknik, prevHist);
 
   // Store extra steps data (formulir content, custom fields) in konten JSON
   const extra = {};
@@ -296,6 +301,9 @@ router.put('/:id', h.requireAuth, (req, res) => {
     const b = req.body;
     const id = req.params.id;
 
+    // Snapshot isi lama SEBELUM ditimpa — untuk auto-deteksi Daftar Perubahan.
+    const _oldSnap = loadDocSnapshot(db, id);
+
     // Update main document fields
     const fields = []; const params = [];
     for (const f of ['judul', 'tingkat_risiko', 'penyusun_nama', 'penyusun_jabatan', 'cloud_path',
@@ -363,8 +371,23 @@ router.put('/:id', h.requireAuth, (req, res) => {
       }
     }
 
+    // Auto-catat Daftar Perubahan untuk section yang berubah.
+    // Hanya saat revisi >= 01 (rev 00 = penerbitan awal, belum ada riwayat).
+    const curRev = (b.revisi !== undefined ? b.revisi : doc.revisi) || '00';
+    let change_history = _parseHistory(_firstStep(db, id)?.change_history);
+    if (parseInt(curRev, 10) >= 1) {
+      const changed = detectChangedSections(_oldSnap, b, doc);
+      const today = _todayStr(db);
+      let added = false;
+      for (const label of changed) {
+        const dup = change_history.some(r => _norm(r.halaman) === _norm(label) && String(r.revisi) === String(curRev));
+        if (!dup) { change_history.push({ halaman: label, uraian: 'Perubahan pada ' + label, revisi: curRev, tanggal: today }); added = true; }
+      }
+      if (added) setChangeHistory(db, id, change_history);
+    }
+
     h.logAudit(req, 'UPDATE_DOCUMENT', `Dokumen ${doc.nomor_dokumen} diperbarui`, 'dokumen');
-    h.success(res, null, 'Dokumen berhasil diperbarui');
+    h.success(res, { change_history }, 'Dokumen berhasil diperbarui');
   } catch (err) { h.error(res, err.message); }
 });
 
@@ -459,24 +482,80 @@ function _parseHistory(raw) {
   if (Array.isArray(raw)) return raw;
   try { const a = JSON.parse(raw); return Array.isArray(a) ? a : []; } catch { return []; }
 }
-// Tambah satu baris ke Daftar Perubahan Dokumen. Membuat ik_steps bila belum ada.
-function appendChangeHistory(db, docId, entry) {
-  const row = _firstStep(db, docId);
-  if (row) {
-    const hist = _parseHistory(row.change_history);
-    hist.push(entry);
-    db.prepare('UPDATE ik_steps SET change_history=? WHERE id=?').run(JSON.stringify(hist), row.id);
-  } else {
-    db.prepare('INSERT INTO ik_steps (dokumen_id, step, change_history) VALUES (?,1,?)')
-      .run(docId, JSON.stringify([entry]));
-  }
-}
 function setChangeHistory(db, docId, arr) {
   const row = _firstStep(db, docId);
   if (row) db.prepare('UPDATE ik_steps SET change_history=? WHERE id=?').run(JSON.stringify(arr || []), row.id);
+  else db.prepare('INSERT INTO ik_steps (dokumen_id, step, change_history) VALUES (?,1,?)').run(docId, JSON.stringify(arr || []));
 }
 function _todayStr(db) {
   return db.prepare("SELECT strftime('%d-%m-%Y','now','localtime') AS t").get().t;
+}
+
+// ── Auto-deteksi section yang berubah untuk Daftar Perubahan Dokumen ──
+function _norm(v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); }
+function _normArr(arr, pick) { return JSON.stringify((Array.isArray(arr) ? arr : []).map(r => pick(r).map(_norm))); }
+
+// Snapshot isi dokumen SEBELUM update (untuk dibandingkan dengan payload baru)
+function loadDocSnapshot(db, id) {
+  return {
+    steps: db.prepare('SELECT * FROM ik_steps WHERE dokumen_id=? ORDER BY step LIMIT 1').get(id) || {},
+    definisi: db.prepare('SELECT * FROM ik_definisi WHERE dokumen_id=?').all(id),
+    sdm: db.prepare('SELECT * FROM ik_sdm WHERE dokumen_id=?').all(id),
+    tools: db.prepare('SELECT * FROM ik_tools WHERE dokumen_id=?').all(id),
+    material: db.prepare('SELECT * FROM ik_material WHERE dokumen_id=?').all(id),
+    formulir: db.prepare('SELECT * FROM ik_formulir WHERE dokumen_id=?').all(id),
+    risiko: db.prepare('SELECT * FROM ik_risiko WHERE dokumen_id=?').all(id),
+    dokTerkait: db.prepare('SELECT * FROM ik_dokumen_terkait WHERE dokumen_id=?').all(id),
+  };
+}
+
+// Kembalikan daftar label section yang berubah (old snapshot vs payload b)
+function detectChangedSections(old, b, doc) {
+  const changed = [];
+  const os = old.steps || {};
+  if (b.steps && typeof b.steps === 'object') {
+    const s = b.steps;
+    if (s.tujuan !== undefined && _norm(s.tujuan) !== _norm(os.tujuan)) changed.push('Tujuan');
+    if (s.ruang_lingkup !== undefined && _norm(s.ruang_lingkup) !== _norm(os.ruang_lingkup)) changed.push('Ruang Lingkup');
+    const aktKeys = ['aktivitas_persiapan', 'aktivitas_pelaksanaan', 'aktivitas_monitoring', 'aktivitas_tindak_lanjut'];
+    if (aktKeys.some(k => s[k] !== undefined)) {
+      const aN = aktKeys.map(k => _norm(s[k])).join('|');
+      const aO = aktKeys.map(k => _norm(os[k])).join('|');
+      if (aN !== aO) changed.push('Detail Aktivitas');
+    }
+    if (s.data_teknik !== undefined && _norm(s.data_teknik) !== _norm(os.data_teknik)) changed.push('Dokumen/Data Teknik');
+    if (s.metode_pengukuran !== undefined) {
+      const mN = typeof s.metode_pengukuran === 'string' ? _norm(s.metode_pengukuran) : _norm(JSON.stringify(s.metode_pengukuran));
+      const mO = os.metode_pengukuran ? (typeof os.metode_pengukuran === 'string' ? _norm(os.metode_pengukuran) : _norm(JSON.stringify(os.metode_pengukuran))) : '';
+      if (mN !== mO) changed.push('Metode Pengukuran');
+    }
+  }
+  if (b.judul !== undefined && _norm(b.judul) !== _norm(doc.judul)) changed.push('Judul');
+  if (b.definisi !== undefined && _normArr(b.definisi, d => [d.istilah, d.penjelasan]) !== _normArr(old.definisi, d => [d.istilah, d.penjelasan])) changed.push('Definisi');
+  if (b.sdm !== undefined && _normArr(b.sdm, r => [r.kompetensi, r.jumlah, r.keterangan]) !== _normArr(old.sdm, r => [r.kompetensi, r.jumlah, r.keterangan])) changed.push('Sumber Daya (SDM)');
+  if (b.tools !== undefined && _normArr(b.tools, r => [r.nama, r.jumlah, r.keterangan]) !== _normArr(old.tools, r => [r.nama, r.jumlah, r.keterangan])) changed.push('Tools/APD');
+  if (b.material !== undefined && _normArr(b.material, r => [r.nama, r.jumlah, r.keterangan]) !== _normArr(old.material, r => [r.nama, r.jumlah, r.keterangan])) changed.push('Material');
+  if (b.formulir !== undefined && _normArr(b.formulir, r => [r.nomor_form || r.nomor, r.judul_form || r.judul]) !== _normArr(old.formulir, r => [r.nomor_form, r.judul_form])) changed.push('Formulir');
+  if (b.risiko !== undefined) {
+    const pick = r => [r.risiko, r.penyebab, r.dampak, r.kemungkinan, r.dampak_level,
+      r.level_inheren != null ? r.level_inheren : r.skor_inheren, r.kontrol_existing,
+      r.level_residual != null ? r.level_residual : r.skor_residual, r.mitigasi];
+    if (_normArr(b.risiko, pick) !== _normArr(old.risiko, pick)) changed.push('Identifikasi Risiko');
+  }
+  if (b.dokumen_pendukung !== undefined || b.dokumen_referensi !== undefined || b.dokumen_perizinan !== undefined) {
+    const newDt = JSON.stringify([
+      (b.dokumen_pendukung || []).map(x => _norm(x.nomor || x.konten)),
+      (b.dokumen_referensi || []).map(x => _norm(x.nama || x.konten)),
+      (b.dokumen_perizinan || []).map(x => _norm(x.nama || x.konten)),
+    ]);
+    const oldDt = JSON.stringify([
+      old.dokTerkait.filter(d => d.tipe === 'Pendukung').map(d => _norm(d.konten)),
+      old.dokTerkait.filter(d => d.tipe === 'Referensi').map(d => _norm(d.konten)),
+      old.dokTerkait.filter(d => d.tipe === 'Perizinan').map(d => _norm(d.konten)),
+    ]);
+    if (newDt !== oldDt) changed.push('Dokumen Terkait');
+  }
+  return changed;
 }
 
 // POST /:id/duplicate — Salin dokumen sebagai IK baru (nomor baru, revisi 00, Draft)
@@ -497,7 +576,10 @@ router.post('/:id/duplicate', h.requireAuth, (req, res) => {
   } catch (err) { h.error(res, err.message); }
 });
 
-// POST /:id/revisi — Buat draft revisi dari dokumen Published
+// POST /:id/revisi — Buka dokumen yang SAMA untuk direvisi.
+// Nomor dokumen TIDAK berubah; revisi naik (mis. 00→01) & status kembali Draft
+// agar bisa diedit. Perubahan per-section tercatat otomatis ke Daftar Perubahan
+// saat disimpan (lihat detectChangedSections di PUT).
 router.post('/:id/revisi', h.requireAuth, (req, res) => {
   try {
     const db = getDB();
@@ -505,29 +587,11 @@ router.post('/:id/revisi', h.requireAuth, (req, res) => {
     if (!src) return h.notFound(res, 'Dokumen tidak ditemukan');
     if (src.status !== 'Published') return h.error(res, 'Hanya dokumen berstatus Published yang bisa direvisi');
 
-    // Cegah revisi ganda yang masih berjalan
-    const open = db.prepare(`SELECT id, nomor_dokumen FROM ik_documents
-      WHERE revisi_dari=? AND status NOT IN ('Archived','Rejected','Published')`).get(src.id);
-    if (open) return h.error(res, `Sudah ada draft revisi berjalan (${open.nomor_dokumen}). Selesaikan atau hapus dulu.`);
-
-    const userId = req.session.user_id;
     const newRev = bumpRevisi(src.revisi);
-    // Nomor sementara unik & mudah dikenali; akan diganti ke nomor kanonik saat publish.
-    const tempNomor = `${src.nomor_dokumen} (Rev ${newRev} draft)`;
-    const out = createClonedDocument(db, src, userId, {
-      judul: src.judul,
-      revisi: newRev, status: 'Draft',
-      nomor: tempNomor, revisi_dari: src.id,
-    });
-    // Catat otomatis ke Daftar Perubahan Dokumen (mewarisi riwayat lama + baris baru).
-    appendChangeHistory(db, out.id, {
-      halaman: 'Seluruh dokumen',
-      uraian: `Revisi berkala (Rev ${src.revisi} → Rev ${newRev})`,
-      revisi: newRev,
-      tanggal: _todayStr(db),
-    });
-    h.logAudit(req, 'REVISE_DOCUMENT', `Draft revisi ${newRev} dibuat dari ${src.nomor_dokumen}`, 'dokumen');
-    h.created(res, { ...out, revisi: newRev, parent_nomor: src.nomor_dokumen });
+    db.prepare("UPDATE ik_documents SET revisi=?, status='Draft', tanggal_diperbarui=date('now','localtime'), updated_at=datetime('now','localtime') WHERE id=?")
+      .run(newRev, src.id);
+    h.logAudit(req, 'REVISE_DOCUMENT', `Dokumen ${src.nomor_dokumen} dibuka untuk revisi ${newRev}`, 'dokumen');
+    h.success(res, { id: src.id, nomor_dokumen: src.nomor_dokumen, revisi: newRev }, `Dokumen dibuka untuk revisi ${newRev}`);
   } catch (err) { h.error(res, err.message); }
 });
 

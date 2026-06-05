@@ -478,15 +478,15 @@ async function duplicateIK(id) {
 
 async function reviseIK(id) {
   const ok = await confirmDialog({
-    title: 'Buat Revisi',
+    title: 'Revisi Dokumen',
     icon: 'git-compare',
-    message: 'Draft revisi baru akan dibuat dari dokumen ini. <b>Versi lama tetap BERLAKU</b> sampai revisi disahkan SM. Setelah sah, nomor dokumen tetap sama dan versi lama otomatis diarsipkan.',
-    confirmText: 'Buat Revisi',
+    message: 'Dokumen ini akan dibuka kembali sebagai <b>Draft</b> untuk direvisi. <b>Nomor dokumen tetap sama</b>, versi naik (mis. 00 → 01). Perubahan yang Anda lakukan akan tercatat otomatis di <b>Daftar Perubahan</b>. Setelah selesai, ajukan ulang persetujuan.',
+    confirmText: 'Mulai Revisi',
   });
   if (!ok) return;
   try {
     const r = await API.reviseDokumen(id);
-    showToast(`Draft revisi ${r.data?.revisi || ''} dibuat ✓`, 'success');
+    showToast(`Dokumen dibuka untuk revisi ${r.data?.revisi || ''} ✓`, 'success');
     APP.cache.masterIK = null;
     await renderMasterIK(document.getElementById('appContent'));
     if (r.data?.id) editDokumen(r.data.id);
