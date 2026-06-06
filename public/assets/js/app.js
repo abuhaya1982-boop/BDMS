@@ -441,9 +441,9 @@ table.step-tbl li{margin-bottom:1px}
 
 /* Screen page structure — paginated content pages must be exact A4 */
 .page-hdr{margin-bottom:8px}
-.page-body{flex:1;overflow:hidden}
+.page-body{flex:1;overflow:visible}
 .page-ftr{margin-top:auto;padding-top:6px}
-.screen-only .content-page{height:297mm;min-height:297mm;max-height:297mm;display:flex;flex-direction:column;overflow:hidden}
+.screen-only .content-page{min-height:297mm;display:flex;flex-direction:column;overflow:visible}
 
 /* Content page wrapper — repeating header & footer on print */
 .content-wrap-table{width:100%;border-collapse:collapse;border:none;table-layout:fixed}
@@ -1412,24 +1412,33 @@ document.addEventListener('DOMContentLoaded', function(){
     currentH = 0;
   }
 
+  // Ukur tinggi sebuah node dalam konteks layout halaman
+  function measure(node){
+    currentBody.appendChild(node);
+    src.appendChild(currentBody);
+    var h = fullHeight(node);
+    src.removeChild(currentBody);
+    currentBody.removeChild(node);
+    return h;
+  }
   for(var i=0; i<children.length; i++){
     var el = children[i];
     var clone = el.cloneNode(true);
-    // Temporarily add to DOM to measure (inside correct layout context)
-    currentBody.appendChild(clone);
-    src.appendChild(currentBody);
-    var elH = fullHeight(clone);
-    src.removeChild(currentBody);
+    var elH = measure(clone);
 
-    if(currentH > 0 && (currentH + elH) > BODY_H){
-      // Remove the clone from current, start new page
-      currentBody.removeChild(clone);
-      newPage();
-      currentBody.appendChild(clone);
-      currentH = elH;
-    } else {
-      currentH += elH;
+    // Keep-with-next: judul/sub-judul jangan ditinggal yatim di dasar halaman —
+    // sertakan tinggi blok berikutnya saat memutuskan perlu halaman baru.
+    var isHeading = el.className && /(^|\s)(sec-title|sub-title)(\s|$)/.test(el.className);
+    var needed = elH;
+    if(isHeading && (i+1) < children.length){
+      needed += measure(children[i+1].cloneNode(true));
     }
+
+    if(currentH > 0 && (currentH + needed) > BODY_H){
+      newPage();
+    }
+    currentBody.appendChild(clone);
+    currentH += elH;
   }
   // Flush last page
   if(currentBody.children.length > 0){
