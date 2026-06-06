@@ -201,22 +201,43 @@ function multiLineParagraphs(text, opts = {}) {
 
 // ═══ HELPER: convert HTML to paragraphs (justified) ═══
 function htmlToParagraphs(html) {
-  if (!html) return [new Paragraph({ children: [new TextRun({ text: '-', font: FONT, size: SZ.md, color: CLR.gray })] })];
-  const text = String(html)
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n').replace(/<\/div>/gi, '\n').replace(/<\/li>/gi, '\n')
-    .replace(/<li[^>]*>/gi, '• ')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x2019;/g, "'").replace(/&nbsp;/g, ' ')
-    .trim();
-  if (!text) return [new Paragraph({ children: [new TextRun({ text: '-', font: FONT, size: SZ.md, color: CLR.gray })] })];
-  return text.split('\n').filter(l => l.trim()).map(line =>
-    new Paragraph({
-      alignment: AlignmentType.JUSTIFIED,
-      spacing: { after: 80 },
-      children: [new TextRun({ text: line.trim(), font: FONT, size: SZ.md })],
-    })
-  );
+  const dash = () => new Paragraph({ children: [new TextRun({ text: '-', font: FONT, size: SZ.md, color: CLR.gray })] });
+  if (!html) return [dash()];
+  const out = [];
+  const MAXW = 620, MAXH = 560; // px — agar muat lebar & 1 halaman
+  // Pisahkan teks dengan gambar inline (<img ...>) agar gambar ikut tampil di DOCX.
+  const parts = String(html).split(/(<img[^>]*>)/gi);
+  for (const part of parts) {
+    if (!part) continue;
+    const imgM = /^<img[^>]*\bsrc\s*=\s*["']([^"']+)["'][^>]*>$/i.exec(part);
+    if (imgM) {
+      const parsed = parseDataUrl(imgM[1]);
+      if (parsed && /^image\//i.test(parsed.mime)) {
+        const dims = imageDims(parsed.buf, parsed.mime) || { w: MAXW, h: Math.round(MAXW * 0.6) };
+        let w = dims.w || MAXW, hgt = dims.h || Math.round(MAXW * 0.6);
+        if (w > MAXW) { hgt = Math.round(hgt * MAXW / w); w = MAXW; }
+        if (hgt > MAXH) { w = Math.round(w * MAXH / hgt); hgt = MAXH; }
+        const fmt = /png/i.test(parsed.mime) ? 'png' : /gif/i.test(parsed.mime) ? 'gif' : /bmp/i.test(parsed.mime) ? 'bmp' : 'jpg';
+        try {
+          out.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 60, after: 60 }, children: [new ImageRun({ type: fmt, data: parsed.buf, transformation: { width: w, height: hgt } })] }));
+        } catch { /* lewati gambar rusak */ }
+      }
+      continue;
+    }
+    const text = part
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n').replace(/<\/div>/gi, '\n').replace(/<\/li>/gi, '\n')
+      .replace(/<li[^>]*>/gi, '• ')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#x2019;/g, "'").replace(/&nbsp;/g, ' ')
+      .trim();
+    if (!text) continue;
+    for (const line of text.split('\n')) {
+      if (!line.trim()) continue;
+      out.push(new Paragraph({ alignment: AlignmentType.JUSTIFIED, spacing: { after: 80 }, children: [new TextRun({ text: line.trim(), font: FONT, size: SZ.md })] }));
+    }
+  }
+  return out.length ? out : [dash()];
 }
 
 function fmtDate(d) {
