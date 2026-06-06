@@ -6,6 +6,49 @@ const { getDB } = require('../db');
 const h = require('../helpers');
 let QRCode = null;
 try { QRCode = require('qrcode'); } catch { /* optional */ }
+const JSZip = require('jszip');
+
+// ── Watermark status (selaras dgn PDF): teks + warna berdasarkan status ──
+function watermarkFor(status) {
+  if (status === 'Published') return { text: 'TERKENDALI', color: '#C0392B', opacity: '0.13' };
+  if (status === 'Archived') return { text: 'TIDAK BERLAKU', color: '#8A8F98', opacity: '0.16' };
+  if (status === 'Rejected') return { text: 'DITOLAK', color: '#8A8F98', opacity: '0.16' };
+  return { text: 'DRAFT', color: '#8A8F98', opacity: '0.16' };
+}
+function _wmVml(text, color, opacity) {
+  return `<w:p><w:r><w:rPr><w:noProof/></w:rPr><w:pict>`
+    + `<v:shape id="WM_${Math.random().toString(36).slice(2,8)}" o:spid="_x0000_s2049" type="#_x0000_t136" `
+    + `style="position:absolute;margin-left:0;margin-top:0;width:468pt;height:150pt;rotation:315;z-index:-251658240;`
+    + `mso-position-horizontal:center;mso-position-horizontal-relative:margin;`
+    + `mso-position-vertical:center;mso-position-vertical-relative:margin" `
+    + `o:allowincell="f" fillcolor="${color}" stroked="f">`
+    + `<v:fill opacity="${opacity}"/>`
+    + `<v:textpath style="font-family:&quot;Courier New&quot;;font-weight:bold;v-text-align:center" string="${text}"/>`
+    + `</v:shape></w:pict></w:r></w:p>`;
+}
+// Sisipkan watermark VML ke seluruh header*.xml (muncul di setiap halaman).
+async function injectWatermark(buffer, status) {
+  const wm = watermarkFor(status);
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    const headers = Object.keys(zip.files).filter(n => /word\/header\d+\.xml$/.test(n));
+    if (!headers.length) return buffer; // tak ada header → lewati
+    for (const n of headers) {
+      let xml = await zip.file(n).async('string');
+      xml = xml.replace(/<w:hdr ([^>]*)>/, (m, attrs) => {
+        if (!/xmlns:v=/.test(attrs)) attrs += ' xmlns:v="urn:schemas-microsoft-com:vml"';
+        if (!/xmlns:o=/.test(attrs)) attrs += ' xmlns:o="urn:schemas-microsoft-com:office:office"';
+        return '<w:hdr ' + attrs + '>';
+      });
+      xml = xml.replace(/(<w:hdr [^>]*>)/, '$1' + _wmVml(wm.text, wm.color, wm.opacity));
+      zip.file(n, xml);
+    }
+    return await zip.generateAsync({ type: 'nodebuffer' });
+  } catch (e) {
+    console.warn('Watermark injection skipped:', e.message);
+    return buffer;
+  }
+}
 const {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   ImageRun, Header, Footer, AlignmentType, PageBreak, HeadingLevel,
@@ -1032,17 +1075,20 @@ function buildDocx(doc, data) {
           ...pageProps,
           verticalAlign: VerticalAlign.CENTER,
         },
+        headers: { default: new Header({ children: [new Paragraph({ children: [] })] }) },
         children: coverChildren,
       },
       // Change history
       {
         properties: { ...pageProps, type: SectionType.NEXT_PAGE },
+        headers: { default: new Header({ children: [new Paragraph({ children: [] })] }) },
         footers: { default: pageFooter },
         children: changeHistoryChildren,
       },
       // Content pages
       {
         properties: { ...pageProps, type: SectionType.NEXT_PAGE },
+        headers: { default: new Header({ children: [new Paragraph({ children: [] })] }) },
         footers: { default: pageFooter },
         children: contentChildren,
       },
@@ -1136,7 +1182,8 @@ async function generateDocxBuffer(id) {
       { steps, definisi, sdm, tools, material, risiko, formulir, dokPendukung, dokReferensi, dokPerizinan, changeHistory, qrBuffer, qrText, attachmentsFormulir, attachmentsDataTeknik, ttd }
     );
 
-    const buffer = await Packer.toBuffer(docx);
+    let buffer = await Packer.toBuffer(docx);
+    buffer = await injectWatermark(buffer, doc.status); // watermark DRAFT/TERKENDALI (selaras PDF)
     const filename = `${doc.nomor_dokumen || 'IK'}_Rev${doc.revisi || '00'}.docx`;
     return { buffer, doc, filename };
 }
