@@ -421,6 +421,10 @@ table.step-tbl li{margin-bottom:1px}
 /* Seragamkan SEMUA font isi (termasuk hasil copy-paste) ke satu jenis */
 .sec-content,.sec-content *{font-family:'Courier Prime','Courier New',Courier,monospace!important;font-size:10pt!important;line-height:1.5!important}
 .sec-content p,.sec-content div,.sec-content span,.sec-content li{max-width:100%!important;margin-left:0!important;margin-right:0!important;text-indent:0!important}
+/* Rapatkan jarak vertikal antar-paragraf (hilangkan margin default ~1em) */
+.sec-content p,.sec-content div{margin-top:0!important;margin-bottom:3px!important}
+.sec-content br{line-height:1!important}
+.sec-content p:empty,.sec-content div:empty{display:none!important}
 .sec-content ul,.sec-content ol{max-width:100%!important;margin-left:20px!important;margin-right:0!important;padding-left:0!important}
 .sec-content table{max-width:100%!important;width:100%!important;table-layout:fixed}
 /* Gambar tidak terpotong: muat dalam 1 halaman (lebar & tinggi dibatasi) */
@@ -592,6 +596,9 @@ table.step-tbl li{margin-bottom:1px}
         .replace(/class="Mso[^"]*"/gi, '')                   // Remove MsoNormal etc classes
         .replace(/<o:p><\/o:p>/gi, '')                       // Remove Office XML tags
         .replace(/style="\s*"/g, '')                         // Remove empty style attrs
+        // Buang paragraf/div kosong & rapatkan jeda berlebih (sumber ruang kosong)
+        .replace(/<(p|div)[^>]*>(\s|&nbsp;|<br\s*\/?>)*<\/\1>/gi, '')
+        .replace(/(<br\s*\/?>\s*){3,}/gi, '<br><br>')
         .replace(/\s{2,}/g, ' ');                            // Collapse whitespace
       return clean;
     }
@@ -713,7 +720,7 @@ table.step-tbl li{margin-bottom:1px}
   const renderAktSectionPrint = (data, title) => {
     if (!hasAktivitasContent(data)) return '';
     if (typeof data === 'string') {
-      return `<div class="sub-title">${title}</div><div class="sec-content">${data}</div>`;
+      return `<div class="sub-title">${title}</div><div class="sec-content">${fmtContent(data)}</div>`;
     }
     if (Array.isArray(data) && data.length) {
       const rows = data.map((s2, i) => {
