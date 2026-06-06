@@ -567,14 +567,16 @@ table.step-tbl li{margin-bottom:1px}
     ? changeHistory.map((r,i) => `<tr><td class="no">${i+1}.</td><td>${escH(r.halaman||'')}</td><td>${escH(r.uraian||'')}</td><td class="no">${escH(r.revisi||'')}</td><td>${escH(r.tanggal||'')}</td></tr>`).join('')
     : `<tr><td class="no">1.</td><td>Seluruh halaman</td><td>Dokumen baru — revisi awal</td><td class="no">00</td><td>${fmtDate(d.tanggal_ditetapkan)}</td></tr>`;
 
-  // Daftar Perubahan kini MENGALIR bersama isi (bukan 1 halaman penuh tersendiri)
-  // agar tidak ada halaman kosong. Diletakkan di awal konten.
-  const changeBlock = `
-  <div class="sec-title" style="text-align:center;border-bottom:none;font-size:12pt;margin:2px 0 8px">DAFTAR PERUBAHAN DOKUMEN</div>
-  <table class="tbl" style="margin-bottom:14px">
+  // Daftar Perubahan = HALAMAN TERSENDIRI (sesuai konsep awal, jangan digabung).
+  const page2 = `
+<div class="page page-break page-top">
+  ${hdrTable}
+  <div class="sec-title" style="text-align:center;border-bottom:none;font-size:12pt;margin-top:16px">DAFTAR PERUBAHAN DOKUMEN</div>
+  <table class="tbl">
     <thead><tr><th style="width:30px">No</th><th>Halaman</th><th>Uraian Perubahan</th><th style="width:60px">Revisi ke-</th><th style="width:90px">Tanggal</th></tr></thead>
     <tbody>${changeRows}</tbody>
-  </table>`;
+  </table>
+</div>`;
 
   // ── Helper: format rich text content (handle \n, bullets •, dashes -, HTML from rich editor) ──
   function fmtContent(text) {
@@ -955,11 +957,9 @@ table.step-tbl li{margin-bottom:1px}
   <span>${nom} Rev.${rev} &mdash; Dicetak ${new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})}</span>
 </div>`;
 
-  // ── PAGE 2+: Content pages with IMS header repeated ──
+  // ── PAGE 3+: Content pages with IMS header repeated ──
   // Screen: shows as multiple A4 "page cards" via JS pagination after load
   // Print: uses <table><thead>/<tfoot> trick for browser-native repeat
-  // Daftar Perubahan diletakkan di awal isi (mengalir, tanpa halaman khusus).
-  body = changeBlock + body;
   const runFooter = `<div style="text-align:center;font-size:8pt;color:#666;padding-top:4px;border-top:0.5px solid #ccc">${nom} &mdash; Rev.${rev} &mdash; PT PLN Nusantara Power UP Brantas</div>`;
 
   // Print version (hidden on screen, shown on print) — uses table trick
@@ -1000,6 +1000,7 @@ table.step-tbl li{margin-bottom:1px}
 <div class="watermark" aria-hidden="true"><span style="color:${wmColor};opacity:${wmOpacity}">${wmText}</span></div>
 <div class="page-container">
   ${coverHtml}
+  ${page2}
   ${printPage3}
   ${screenPage3}
 </div>
