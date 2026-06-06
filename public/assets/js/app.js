@@ -419,14 +419,14 @@ table.step-tbl li{margin-bottom:1px}
 .step-meta{color:#555;font-size:8.5pt}
 .sec-content{margin:4px 0 12px;font-size:10pt;overflow-wrap:break-word;word-wrap:break-word;word-break:break-word;max-width:100%;overflow:visible;text-align:justify}
 /* Seragamkan SEMUA font isi (termasuk hasil copy-paste) ke satu jenis */
-.sec-content,.sec-content *{font-family:'Courier Prime','Courier New',Courier,monospace!important}
+.sec-content,.sec-content *{font-family:'Courier Prime','Courier New',Courier,monospace!important;font-size:10pt!important;line-height:1.5!important}
 .sec-content p,.sec-content div,.sec-content span,.sec-content li{max-width:100%!important;margin-left:0!important;margin-right:0!important;text-indent:0!important}
 .sec-content ul,.sec-content ol{max-width:100%!important;margin-left:20px!important;margin-right:0!important;padding-left:0!important}
 .sec-content table{max-width:100%!important;width:100%!important;table-layout:fixed}
 /* Gambar tidak terpotong: muat dalam 1 halaman (lebar & tinggi dibatasi) */
 .sec-content img{max-width:100%!important;max-height:200mm!important;height:auto!important;display:block;margin:6px auto;page-break-inside:avoid;break-inside:avoid}
 /* Watermark status — diagonal kanan, transparan */
-.watermark{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:flex-end;padding-right:7%;pointer-events:none;z-index:50;overflow:hidden}
+.watermark{position:fixed;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:50;overflow:hidden}
 .watermark span{transform:rotate(-50deg);font-family:'Courier Prime','Courier New',Courier,monospace;font-weight:700;font-size:50pt;letter-spacing:6px;white-space:nowrap;border:5px solid currentColor;border-radius:10px;padding:10px 32px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .sec-content p.content{margin:4px 0}
 .sec-content ul.content-list{margin:4px 0 8px 20px}
@@ -587,7 +587,9 @@ table.step-tbl li{margin-bottom:1px}
         .replace(/tab-stops\s*:\s*[^;"']+;?/gi, '')         // Remove tab-stops
         .replace(/line-height\s*:\s*[^;"']+;?/gi, '')       // Remove line-height overrides
         .replace(/font-family\s*:\s*[^;"']+;?/gi, '')       // Remove custom font-family
-        .replace(/<\/?font[^>]*>/gi, '')                     // Remove <font face=...> tags (seragamkan font)
+        .replace(/font-size\s*:\s*[^;"']+;?/gi, '')          // Remove custom font-size (seragamkan ukuran)
+        .replace(/font\s*:\s*[^;"']+;?/gi, '')               // Remove 'font' shorthand
+        .replace(/<\/?font[^>]*>/gi, '')                     // Remove <font face/size=...> tags
         .replace(/class="Mso[^"]*"/gi, '')                   // Remove MsoNormal etc classes
         .replace(/<o:p><\/o:p>/gi, '')                       // Remove Office XML tags
         .replace(/style="\s*"/g, '')                         // Remove empty style attrs

@@ -882,8 +882,8 @@ async function renderBuatIK(container) {
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         ${!editingDocId ? `<button class="btn btn-ghost btn-sm" onclick="reloadActiveTemplate()" title="Muat ulang template aktif dari server" style="font-size:11px;color:var(--text-tertiary)">${icon('refresh-cw', 13)} Sync Template</button>` : ''}
-        <button class="btn btn-secondary btn-sm" onclick="saveDraft()">${icon('save', 14)} Draft</button>
-        <button class="btn btn-primary btn-sm" onclick="submitIK()">${icon('upload', 14)} Submit</button>
+        <button class="btn btn-secondary btn-sm" id="btnSaveDraft" onclick="saveDraft()">${icon('save', 14)} Draft</button>
+        <button class="btn btn-primary btn-sm" id="btnSubmitIK" onclick="submitIK()">${icon('upload', 14)} Submit</button>
       </div>
     </div>
     ${activeTemplate ? `<div style="background:#EBF5FF;border:1px solid #B3D4FC;border-radius:6px;padding:8px 12px;margin-bottom:8px;font-size:11px;color:#1565C0">
@@ -1576,6 +1576,16 @@ function clearTTD(role) {
 // Guard against double-click creating duplicate records (shared by saveDraft & submitIK)
 let _saveInFlight = false;
 
+// Indikator proses pada tombol Draft/Submit (cegah kebingungan & double-klik)
+function setDocBusy(busy, which) {
+  const sd = document.getElementById('btnSaveDraft');
+  const su = document.getElementById('btnSubmitIK');
+  [sd, su].forEach(b => { if (b) b.disabled = busy; });
+  const active = which === 'submit' ? su : sd;
+  if (active) active.classList.toggle('btn-loading', busy);
+  document.body.style.cursor = busy ? 'progress' : '';
+}
+
 async function saveDraft() {
   if (_saveInFlight) return; // ignore rapid double-click while a save is running
   const data = collectDocData();
@@ -1583,6 +1593,7 @@ async function saveDraft() {
   if (!data.unit_id) { showToast('Pilih unit/bidang', 'error'); return; }
   if (!data.probis_id) { showToast('Pilih proses bisnis (Probis)', 'error'); return; }
   _saveInFlight = true;
+  setDocBusy(true, 'draft');
   try {
     if (editingDocId) {
       // Server-side auto-detects changes and appends to change_history
@@ -1600,7 +1611,7 @@ async function saveDraft() {
       showToast('Draft tersimpan — No. ' + (res.data?.nomor_dokumen || ''), 'success');
     }
   } catch (e) { console.error('saveDraft error:', e); showToast('Gagal menyimpan: ' + e.message, 'error'); }
-  finally { _saveInFlight = false; }
+  finally { _saveInFlight = false; setDocBusy(false, 'draft'); }
 }
 
 // ════════════════════════════════════════════
@@ -1635,6 +1646,8 @@ async function submitIK() {
   if (!data.unit_id) { showToast('Pilih unit/bidang', 'error'); return; }
   if (!data.probis_id) { showToast('Pilih proses bisnis (Probis)', 'error'); return; }
   _saveInFlight = true;
+  setDocBusy(true, 'submit');
+  showToast('Menyubmit dokumen…', 'info');
   try {
     if (editingDocId) {
       // Server auto-records change history
@@ -1647,5 +1660,5 @@ async function submitIK() {
     showToast('Dokumen disubmit untuk review', 'success');
     showPage('master-ik');
   } catch (e) { showToast('Gagal: ' + e.message, 'error'); }
-  finally { _saveInFlight = false; }
+  finally { _saveInFlight = false; setDocBusy(false, 'submit'); }
 }
