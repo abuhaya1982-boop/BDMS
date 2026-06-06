@@ -483,6 +483,14 @@ function buildDocx(doc, data) {
   const pageProps = {
     page: { size: { width: A4_W, height: A4_H }, margin: MARGIN },
   };
+  // Section dgn header IMS berulang: top margin diperbesar agar header (di area
+  // page-header Word) muat di atas body — meniru PDF (header tiap halaman).
+  const HDR_MARGIN = { ...MARGIN, top: 1850, header: 510 };
+  const hdrPageProps = {
+    page: { size: { width: A4_W, height: A4_H }, margin: HDR_MARGIN },
+  };
+  // Header IMS untuk dipakai di page-header (fungsi → instance baru tiap section)
+  const imsHeader = () => new Header({ children: [makeHeaderTable(nom, judul, rev, doc.tanggal_terbit)] });
 
   // Footer with page numbering "Halaman X dari Y"
   const pageFooter = new Footer({
@@ -624,8 +632,6 @@ function buildDocx(doc, data) {
       ] })];
 
   const changeHistoryChildren = [
-    makeHeaderTable(nom, judul, rev, doc.tanggal_terbit),
-    new Paragraph({ spacing: { before: 300 } }),
     new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 200 }, children: [
       new TextRun({ text: 'DAFTAR PERUBAHAN DOKUMEN', bold: true, font: FONT, size: SZ.lg }),
     ]}),
@@ -647,8 +653,7 @@ function buildDocx(doc, data) {
   //  SECTION 3: CONTENT PAGES
   // ═══════════════════════════════════
   const contentChildren = [
-    makeHeaderTable(nom, judul, rev, doc.tanggal_terbit),
-    new Paragraph({ spacing: { before: 200 } }),
+    new Paragraph({ spacing: { before: 40 } }),
   ];
   let secNum = 1;
 
@@ -1099,17 +1104,17 @@ function buildDocx(doc, data) {
         headers: { default: new Header({ children: [new Paragraph({ children: [] })] }) },
         children: coverChildren,
       },
-      // Change history
+      // Change history — header IMS berulang tiap halaman
       {
-        properties: { ...pageProps, type: SectionType.NEXT_PAGE },
-        headers: { default: new Header({ children: [new Paragraph({ children: [] })] }) },
+        properties: { ...hdrPageProps, type: SectionType.NEXT_PAGE },
+        headers: { default: imsHeader() },
         footers: { default: pageFooter },
         children: changeHistoryChildren,
       },
-      // Content pages
+      // Content pages — header IMS berulang tiap halaman
       {
-        properties: { ...pageProps, type: SectionType.NEXT_PAGE },
-        headers: { default: new Header({ children: [new Paragraph({ children: [] })] }) },
+        properties: { ...hdrPageProps, type: SectionType.NEXT_PAGE },
+        headers: { default: imsHeader() },
         footers: { default: pageFooter },
         children: contentChildren,
       },
