@@ -281,7 +281,7 @@ function buildHeatMapHtml(risiko) {
   // Probability rows (E=5 down to A=1)
   probLabels.forEach((p, i) => {
     h += `<tr>`;
-    if (i === 0) h += `<td rowspan="5" style="border:1px solid #ccc;background:#f5f5f5;mso-pattern:auto none;background-color:#f5f5f5;text-align:center;font-weight:700;padding:6px 2px;font-size:11px;width:${hmLabelW};mso-text-orientation:upward">P<br>R<br>O<br>B</td>`;
+    if (i === 0) h += `<td rowspan="5" style="border:1px solid #ccc;background:#f5f5f5;mso-pattern:auto none;background-color:#f5f5f5;text-align:center;font-weight:700;padding:4px 2px;font-size:10px;line-height:1.05;width:${hmLabelW};mso-text-orientation:upward">P<br>R<br>O<br>B<br>A<br>B<br>I<br>L<br>I<br>T<br>A<br>S</td>`;
     h += `<td style="border:1px solid #ccc;background:#f5f5f5;mso-pattern:auto none;background-color:#f5f5f5;text-align:center;font-weight:600;padding:3px;line-height:1.2;width:${hmProbW}">${p.label}<br><b>${p.key}</b></td>`;
     dampakLabels.forEach(d => {
       const c = rmGet(p.val, d.val);
