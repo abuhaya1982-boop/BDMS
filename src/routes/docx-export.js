@@ -1040,6 +1040,12 @@ function buildDocx(doc, data) {
 
   // ═══ QR CODE BLOCK (dokumen verification) ═══
   if (qrBuffer) {
+    // URL/teks QR panjang tanpa spasi tak bisa di-wrap Word → tambah zero-width
+    // space (U+200B) setelah pemisah & tiap ~24 char agar tidak melampaui margin.
+    const ZW = String.fromCharCode(0x200B); // zero-width space
+    const qrDisplay = String(qrText || `${nom} • Rev.${rev}`)
+      .replace(/([/\-_.?&=:|])/g, '$1' + ZW)
+      .replace(/(\S{24})(?=\S)/g, '$1' + ZW);
     contentChildren.push(new Paragraph({ spacing: { before: 360, after: 100 } }));
     const qrColW = 1700;
     const qrTxtW = CONTENT_W - qrColW;
@@ -1072,7 +1078,7 @@ function buildDocx(doc, data) {
               new TextRun({ text: 'Pindai QR Code untuk memverifikasi keaslian dan mengakses dokumen elektronik terkendali pada repositori resmi.', font: FONT, size: SZ.sm }),
             ]}),
             new Paragraph({ spacing: { after: 0 }, children: [
-              new TextRun({ text: qrText || `${nom} • Rev.${rev}`, font: FONT, size: SZ.xs, color: CLR.gray }),
+              new TextRun({ text: qrDisplay, font: FONT, size: SZ.xs, color: CLR.gray }),
             ]}),
           ],
         }),
